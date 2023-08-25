@@ -1,6 +1,6 @@
-# incarceration-medicaid
-Population health and health equity implications of a Medicaid-facilitated transitional care policy bundle for individuals released from incarceration in the United States: a microsimulation and cost-effectiveness analysis
+# Population health and health equity implications of a Medicaid-facilitated transitional care policy bundle for individuals released from incarceration in the United States: a microsimulation and cost-effectiveness analysis
 
+Pre-specified analysis plan: August 25, 2023
 1. Study Design:
    - The study will use a microsimulation model to estimate the implications of implementing the HHS-recommended transitional care bundle for individuals released from prisons or jails in the United States.
    - The model will simulate the health outcomes and healthcare utilization of released individuals over a ten-year period, comparing the current state of care with the proposed bundle of interventions.
