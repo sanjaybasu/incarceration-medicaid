@@ -38,4 +38,4 @@ Population health and health equity implications of a Medicaid-facilitated trans
      - Total societal costs including incarceration costs.
 8. Cost-Effectiveness Analysis:
    - The study will perform cost-effectiveness analysis from a societal perspective by calculating the incremental cost-effectiveness of the bundle of modeled interventions in isolation and in concert.
-   - The incremental cost-effectiveness ratio will be computed in terms of both health care expenditures alone and in total societal expenditures (including incarceration costs), over a 10-year policy planning horizon at
+   - The incremental cost-effectiveness ratio will be computed in terms of both health care expenditures alone and in total societal expenditures (including incarceration costs), over a 10-year policy planning horizon.
