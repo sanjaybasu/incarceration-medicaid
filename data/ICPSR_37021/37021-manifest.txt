@@ -1,0 +1,142 @@
+File Manifest for ICPSR 37021
+
+United States Department of Justice. Office of Justice Programs. Bureau of
+Justice Statistics. National Corrections Reporting Program, 1991-2016:
+Selected Variables. ICPSR37021-v1. Ann Arbor, MI: Inter-university
+Consortium for Political and Social Research [distributor], 2018-08-30.
+http://doi.org/10.3886/ICPSR37021.v1
+
+
+Study-level Documentation
+
+    Filename                            Record  Record    Var.    Date        MD5
+                                        Length  Count     Count   Updated     Checksum
+
+    37021-descriptioncitation.pdf       -       -         -       2018-08-30  -
+
+    37021-related_literature.txt        -       -         -       daily       -
+
+    37021-manifest.txt                  -       -         -       daily       -
+
+    37021-Codebook.pdf                  -       -         -       2018-08-30  0cf03ca387a0ab164f99b8725847736e
+
+
+DS0001 Term Records
+
+    Filename                            Record  Record    Var.    Date        MD5
+                                        Length  Count     Count   Updated     Checksum
+
+    37021-0001-Data.dta                 -       12,342,783 18      2018-08-30  71481efd994aa2dbb772e032bbb1d1eb
+
+    37021-0001-Data.rda                 -       12,342,783 18      2018-08-30  dcf4449e45947cecd4b243faa3b8e743
+
+    37021-0001-Data.sav                 -       12,342,783 18      2018-08-30  4d95e5eb3a2b4a7b08fc262e80a4049c
+
+    37021-0001-Data.stc                 -       12,342,783 18      2018-08-30  0a33bf1b585ddafaba42047d1fbe2f35
+
+    37021-0001-Data.tsv                 -       12,342,783 18      2018-08-30  43bb427beeba9d37a95c65715f949b23
+
+    37021-0001-Data.txt                 54      12,342,783 18      2018-08-30  092ce450a645b69584867ee0a57a594b
+
+    37021-0001-Setup.dct                -       -         -       2018-08-30  b53cf0fff76215172e635e3f603eb2a5
+
+    37021-0001-Setup.do                 -       -         -       2018-08-30  5e06ba8f5d9973a8ccb53e6317db867a
+
+    37021-0001-Setup.sas                -       -         -       2018-08-30  0aeac402d3a161fda781e82cb5eb4eb1
+
+    37021-0001-Setup.sps                -       -         -       2018-08-30  1005cfab1664b7c271a02d306d66c6ff
+
+    37021-0001-Supplemental_syntax.do   -       -         -       2018-08-30  5357ba28cd95f4768f9a3207c31a0ced
+
+    37021-0001-Supplemental_syntax.sas  -       -         -       2018-08-30  291009ee35150c244a446e047867a640
+
+
+DS0002 Prison Admissions
+
+    Filename                            Record  Record    Var.    Date        MD5
+                                        Length  Count     Count   Updated     Checksum
+
+    37021-0002-Data.dta                 -       15,235,418 14      2018-08-30  943ed935392c612fbd774c711f4c18e3
+
+    37021-0002-Data.rda                 -       15,235,418 14      2018-08-30  925cb89604ea0805625332c634413092
+
+    37021-0002-Data.sav                 -       15,235,418 14      2018-08-30  35ebbc233703000244cfdc7c6cb2c12e
+
+    37021-0002-Data.stc                 -       15,235,418 14      2018-08-30  7f51a1fc325912ee614427168d1f83e6
+
+    37021-0002-Data.tsv                 -       15,235,418 14      2018-08-30  f612512b3487c85fa8525baa7ddf8f37
+
+    37021-0002-Data.txt                 31      15,235,418 14      2018-08-30  896939f90ae14296ef2276d09ff440db
+
+    37021-0002-Setup.dct                -       -         -       2018-08-30  854793e9e87ecd411335cff509d0a652
+
+    37021-0002-Setup.do                 -       -         -       2018-08-30  bd682a94738652b500090e93f153401c
+
+    37021-0002-Setup.sas                -       -         -       2018-08-30  e895fdd16084a00f9a24a47502a169d6
+
+    37021-0002-Setup.sps                -       -         -       2018-08-30  ddd8d7e650c87ca2d5f1b3c5d22a97b0
+
+    37021-0002-Supplemental_syntax.do   -       -         -       2018-08-30  0f3fe486698770efbf8958f9d2489970
+
+    37021-0002-Supplemental_syntax.sas  -       -         -       2018-08-30  14b89233035679ab94dc0857a33a9d71
+
+
+DS0003 Prison Releases
+
+    Filename                            Record  Record    Var.    Date        MD5
+                                        Length  Count     Count   Updated     Checksum
+
+    37021-0003-Data.dta                 -       14,704,548 18      2018-08-30  d9524cc05c6aa7830fb0b06776fd1d67
+
+    37021-0003-Data.rda                 -       14,704,548 18      2018-08-30  8c74f81fb7d910710633802f2f4172dd
+
+    37021-0003-Data.sav                 -       14,704,548 18      2018-08-30  bb236966cc1da3017f504616d7460809
+
+    37021-0003-Data.stc                 -       14,704,548 18      2018-08-30  410c62a9008f5f2bb9a9a383c70bcc7d
+
+    37021-0003-Data.tsv                 -       14,704,548 18      2018-08-30  ca689a4f70148dc431b53895aee3250e
+
+    37021-0003-Data.txt                 39      14,704,548 18      2018-08-30  61015bddf81aeb6833d10badaba389c0
+
+    37021-0003-Setup.dct                -       -         -       2018-08-30  e62bfa2c7193c9fcd51d945ecd50e9b1
+
+    37021-0003-Setup.do                 -       -         -       2018-08-30  79f7ed728e9f07ea582605ed3f2f93ad
+
+    37021-0003-Setup.sas                -       -         -       2018-08-30  9c59bb42265f041f370e46f8459f5d22
+
+    37021-0003-Setup.sps                -       -         -       2018-08-30  9cb3e8d927881373261d59cd4555e42f
+
+    37021-0003-Supplemental_syntax.do   -       -         -       2018-08-30  bdc93ef9b063f49353d1d08b258d862a
+
+    37021-0003-Supplemental_syntax.sas  -       -         -       2018-08-30  045b78fec65c8edea9dbc4443b5fde90
+
+
+DS0004 Year-end Population
+
+    Filename                            Record  Record    Var.    Date        MD5
+                                        Length  Count     Count   Updated     Checksum
+
+    37021-0004-Data.dta                 -       21,443,874 16      2018-08-30  7b6ea8490f8aaafee257e53e015b0e0c
+
+    37021-0004-Data.rda                 -       21,443,874 16      2018-08-30  fe7633d2617e01ccff222df3bd1c1965
+
+    37021-0004-Data.sav                 -       21,443,874 16      2018-08-30  9b4e68fdbe7785cd8ba31b6a3a0fcfcf
+
+    37021-0004-Data.stc                 -       21,443,874 16      2018-08-30  6b6e8ba3e1f90322afc70799da370251
+
+    37021-0004-Data.tsv                 -       21,443,874 16      2018-08-30  dd73513f337313e4a6134aa7e7a10c5b
+
+    37021-0004-Data.txt                 33      21,443,874 16      2018-08-30  48df55f27b8189b9d870d9c48a8835fa
+
+    37021-0004-Setup.dct                -       -         -       2018-08-30  f24e55e85b3ddae02d392c70e0d13757
+
+    37021-0004-Setup.do                 -       -         -       2018-08-30  6b1bb073cefe53ebf95c7ed7ad775d6c
+
+    37021-0004-Setup.sas                -       -         -       2018-08-30  7de29f5effac92bfa17099cdb81740e4
+
+    37021-0004-Setup.sps                -       -         -       2018-08-30  caca0d9dc9794a958a9dc6906d7cd7fa
+
+    37021-0004-Supplemental_syntax.do   -       -         -       2018-08-30  a7c5265bcee1a0ee74a5b93d75900dc4
+
+    37021-0004-Supplemental_syntax.sas  -       -         -       2018-08-30  f963908af9314596ce6f1e82321d5885
+

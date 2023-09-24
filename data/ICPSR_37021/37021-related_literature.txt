@@ -1,0 +1,68 @@
+Bibliography
+National Corrections Reporting Program, 1991-2016: Selected Variables
+
+This bibliography includes published and unpublished works that are related 
+to ICPSR study 37021. It includes works that are based on primary
+or secondary analysis of the data, or which describe or critique those
+data or the collection methodology. 
+
+If you publish a work or know of other works that are based on these data,
+please send the complete citation and name of the ICPSR study used to:
+icpsr-biblio-notify@umich.edu 
+
+
+1. Baumgartner, Frank R.; Daniely, Tamira; Huang, Kalley; Johnson, Sydney;
+Love, Alexander; May, Lyle; Mcgloin, Patrice; Swagert, Allison; Vattikonda,
+Niharika; Washington, Kamryn, "Throwing away the key: The unintended
+consequences of 'tough-on-crime' laws." Perspectives on Politics. in press
+2021,. DOI: 10.1017/S153759272100164X
+
+2. Fone, Zachary, "Essays in Applied Microeconomics: Policy Interventions
+and Spillovers to Crime." Dissertation, University of New Hampshire, 2020.
+
+3. Fone, Zachary S.; Sabia, Joseph J.; Cesur, Resul, "Do Minimum Wage
+Increases Reduce Crime?." NBER Working Paper 25647. Cambridge, MA: National
+Bureau of Economic Research, Mar 2019. DOI: 10.3386/w25647
+Abstract: https://www.nber.org/papers/w25647
+Full text PDF: https://www.nber.org/papers/w25647.pdf
+
+4. Fone, Zachary S.; Sabia, Joseph J.; Cesur, Resul, "Do Minimum Wage
+Increases Reduce Crime?." Washington, DC: Employment Policies Institute,
+Mar 2019.
+Full text PDF: https://epionline.org/app/uploads/2019/03/EPI_MinimumWageReducingCrimeStudy_Final-2.pdf
+
+5. Grunwald, Ben, "Toward an optimal decarceration strategy." Stanford Law
+and Policy Review. Mar 2022, 33, (1), 1 - 78.
+Full text PDF: https://www-cdn.law.stanford.edu/wp-content/uploads/2022/04/Online-Edition-Grunwald1.pdf
+
+6. Johnson, Gilbert W., "The Effects of Educational Attainment on Sentence
+Length." Thesis, Valdosta State University, 2021.
+Abstract: https://vtext.valdosta.edu/xmlui/handle/10428/5191
+
+7. Kaeble, Danielle, "Time Served in State Prison, 2016." Bulletin. NCJ
+252205, Washington, DC: Bureau of Justice Statistics, Nov 2018.
+Abstract: https://www.bjs.gov/index.cfm?ty=pbdetail&iid=6446
+Full text PDF: https://www.bjs.gov/content/pub/pdf/tssp16.pdf
+
+8. Papp, Jordan; Mueller-Smith, Michael, "Benchmarking the Criminal Justice
+Administrative Records System's Data Infrastructure." Ann Arbor, MI:
+Institute for Social Research at the University of Michigan, 2021.
+Full text PDF: https://cjars.isr.umich.edu/wp-content/uploads/2021_Benchmarking_White_Paper.pdf
+
+9. Pham, Duy, "Investing in People or Prisons? The Impact of State
+Investments on Incarceration Rates." Thesis, Georgetown University, 2020.
+Abstract: https://repository.library.georgetown.edu/handle/10822/1059624
+
+10. Prescott, J.J.; Pyle, Benjamin; Starr, Sonja B., "Understanding
+Violent-Crime Recidivism." Notre Dame Law Review. in press 2020,.
+Abstract: https://ssrn.com/abstract=3571912
+
+11. Ramos, Stefany Y., "Three Essays on Risk Assessment Instrument Policies
+Across State Criminal Justice Systems." Dissertation, University of North
+Carolina, 2021. DOI: 10.17615/sepv-c605
+Abstract: https://ssrn.com/abstract=3571912
+
+12. Sabol, William J.; Johnson, Thaddeus L.; Caccavale, Alexander, "Trends
+in correctional control by race and sex." Federal Sentencing Reporter.
+2020, 32, (3), 157 - 177. DOI: 10.1525/fsr.2020.32.3.157
+Abstract: https://ssrn.com/abstract=3571912
