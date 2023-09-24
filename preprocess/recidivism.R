@@ -287,5 +287,5 @@ g <- ggplot(rr_combined,
   facet_wrap(~Age) +
   theme_classic(base_size = 14)
 
-ggsave(file.path(path_to_figs,"recidisivm.pdf"), width = 6, height = 6)
+ggsave(file.path(here::here(), "preprocess","figs","recidisivm.pdf"), width = 8, height = 6)
 
