@@ -48,6 +48,6 @@ state_long <- state_long.t %>%
                           T ~ paste0(str_to_title(race), " (NH)")
                           ))
 
-write_csv(state_long, file.path(here::here(), "data","jailReleases_byStateSexRace.csv"))
+write_csv(state_long, file.path(here::here(), "data","jailCensus_byStateSexRace.csv"))
 
 
