@@ -260,15 +260,15 @@ npred90 <- predict(mod.n90, newdata = df_comb, re.form = NA ,type = "link", se.f
 df_comb <- cbind(df_comb %>% 
                    select(-nStrata), 
                  npred30, npred60, npred90) %>% 
-  select(-countyid)
+  dplyr::select(-countyid)
 
 df_comb_long <- df_comb %>%
-  select(-ends_with(".se")) %>%
+  dplyr::select(-ends_with(".se")) %>%
   pivot_longer(matches("^p[0-9]"), names_to = "los_cutoff", values_to = "p") %>%
   mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.m$","",los_cutoff)))) %>%
   left_join(
     df_comb %>%
-      select(-ends_with(".m")) %>%
+      dplyr::select(-ends_with(".m")) %>%
       pivot_longer(matches("^p[0-9]"), names_to = "los_cutoff", values_to = "se") %>%
       mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.se$","",los_cutoff))))
   ) %>%
@@ -277,6 +277,27 @@ df_comb_long <- df_comb %>%
          p.upr = exp(p + (qnorm(0.975) * se)))
 
 states <- unique(df_comb_long$state)
+
+ageEsts_long <- ageEsts %>%
+  group_by(state, raceEthnicity, sex_gender_standardized, ageCat) %>%
+  summarise(n30 = sum(n30, na.rm = T), n60 = sum(n60, na.rm = T), n90 = sum(n90, na.rm = T), nStrata = sum(nStrata)) %>%
+  mutate(p30 = n30/nStrata, p60 = n60/nStrata, p90 = n90/nStrata) %>%
+  select(-matches("^n.0$")) %>%
+  pivot_longer(starts_with("p"), names_to = "los_cutoff", values_to = "p.raw", names_transform = ~as.numeric(gsub("p","",.)))
+
+df_comb_long <- df_comb_long %>%
+  left_join(ageEsts_long)
+
+ggplot(df_comb_long, aes(x = p.raw, y = p.m)) + 
+  geom_point(alpha = 0.2) + 
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") + 
+  coord_equal(xlim=c(0,.25),ylim=c(0,.25)) + #bulk of points fall within this range
+  theme_classic()
+
+summary(df_comb_long$p.raw - df_comb_long$p.m)
+sd(df_comb_long$p.raw - df_comb_long$p.m, na.rm = T) #within the confidence intervals
+
+
 library(ggplot2)
 
 for(los in c(30, 60, 90)){

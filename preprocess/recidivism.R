@@ -11,6 +11,7 @@
 
 library(readr)
 library(here)
+library(plyr)
 library(dplyr)
 library(stringr)
 library(tidyr)
@@ -18,6 +19,7 @@ library(rlang)
 library(ggplot2)
 
 path_to_recidivism05 <- file.path(here::here(), "data","raw","rprts05p0510")
+path_to_recidivism08 <- file.path(here::here(), "data","raw","rpr24s0810yfup0818")
 path_to_recidivism12 <- file.path(here::here(), "data","raw","rpr34s125yfup1217")
 path_to_releases <- file.path(here::here(), "data","raw","ICPSR_37021")
 
@@ -25,17 +27,49 @@ time_to_recidiv <- read_csv(file.path(path_to_recidivism05, "rprts05p0510f01.csv
   filter(!is.na(`All releases`)) %>%
   mutate(`Time to rearrest (in months)` = as.numeric(`Time to rearrest (in months)`))
 
+time_to_recidiv08 <- read_csv(file.path(path_to_recidivism08, "rpr24s0810yfup0818f02.csv"), skip = 10) %>%
+  filter(!is.na(`Arrest/a`)) %>%
+  mutate(`Time to rearrest (in months)` = as.numeric(gsub('.{2}$', '', `Year of release`))*12) %>%
+  rename(`All releases` = `Arrest/a`, `Conviction` = `Conviction/b`, `Return to prison` = `Return to prison/c`) %>%
+  select(-c(`Year of release`, ...3, ...5, ...7)) %>%
+  filter(`Time to rearrest (in months)` <= max(time_to_recidiv$`Time to rearrest (in months)`))
+
+time_to_recidiv_long <- time_to_recidiv %>% 
+  pivot_longer(cols = 2:4, names_to = "recidivism_type", values_to = "cum.recidivism") %>%
+  rename(Month = `Time to rearrest (in months)`) %>%
+  mutate(recidivism_type = recode(recidivism_type, 
+                                  `All releases` = "rearrested", 
+                                  Conviction = "reconvicted",
+                                  `Return to prison` = "return to prison"),
+         cum.recidivism = cum.recidivism / 100
+         )
+
+time_to_recidiv_long08 <- time_to_recidiv08 %>%
+  pivot_longer(cols = 1:3, names_to = "recidivism_type", values_to = "cum.recidivism") %>%
+  rename(Month = `Time to rearrest (in months)`) %>%
+  mutate(recidivism_type = recode(recidivism_type, 
+                                  `All releases` = "rearrested", 
+                                  Conviction = "reconvicted",
+                                  `Return to prison` = "return to prison"),
+         cum.recidivism = cum.recidivism / 100
+  )
+  
 #plot recidivism (cumulative % of first recidivism event) by type
 #note only the 2005 one has it by month
-ggplot(time_to_recidiv %>% pivot_longer(cols = 2:4), 
-       aes(x = `Time to rearrest (in months)`, y = value, color = name)) + 
-  geom_line() +
-  theme_classic(base_size = 14) +
-  labs(y = "People (%)", color = NULL)
+# ggplot(time_to_recidiv_long, 
+#        aes(x = Month, y = cum.recidivism, color = recidivism_type)) + 
+#   geom_line() +
+#   theme_classic(base_size = 14) +
+#   scale_y_continuous("Persons released (%)", labels=scales::percent_format(accuracy = 1)) +
+#   labs(color = NULL)
 
 #load in states in study. 34 states had data on arrests
 states_sampled <- read_csv(file.path(path_to_recidivism12, "rpr34s125yfup1217at01.csv"), skip = 11) %>%
   filter(!is.na(`Sample size`))
+#31 states had data to assess reconvictions (excludes KY, LA, ME)
+states_reconvict <- states_sampled %>%
+  filter(!is.na(State), !(State %in% c("Kentucky","Louisiana","Maine"))) %>%
+  pull(State)
 #only 21 states had data to assess reincarcerations
 states_reincarc <- c("Arizona", "California", "Colorado", "Florida", "Georgia",
                        "Iowa", "Kansas", "Massachusetts", "Michigan", "Missouri",
@@ -108,9 +142,11 @@ write_csv(df_releases, file.path(here::here(), "data","raw","prison_releases_201
 
 #load in recidivism at 1 year mark by race, age, and sex
 ##We calculate these stats, with the reference being Male, White, and 25-39
-process_recidivism <- function(rtype = c("rearrested","reconvicted","reimprisoned")){
+process_recidivism <- function(rtype = c("rearrested","reconvicted","return to prison")){
   states_recidiv = na.omit(states_sampled$State)
   nskip = 10
+  
+  print(rtype)
   
   if(rtype == "rearrested"){
     finame = "rpr34s125yfup1217t04.csv"
@@ -119,8 +155,9 @@ process_recidivism <- function(rtype = c("rearrested","reconvicted","reimprisone
   if(rtype == "reconvicted"){
     finame = "rpr34s125yfup1217t07.csv"
     cname = "Conviction"
+    states_recidiv = states_reconvict
     }
-  if(rtype == "reimprisoned"){
+  if(rtype == "return to prison"){
     finame = "rpr34s125yfup1217t08.csv"
     cname = "Return to prison"
     states_recidiv = states_reincarc
@@ -133,7 +170,7 @@ process_recidivism <- function(rtype = c("rearrested","reconvicted","reimprisone
   recidiv_stats <- recidiv_stats[,names(perc_cols)[perc_cols == 0]] %>%
     select(-Characteristic) %>%
     rename(Characteristic = ...2) %>%
-    mutate(Characteristic = gsub("(\\*)|(/a)|(,b)","",gsub("(\x96)","-", ifelse(is.na(Characteristic), ...3, Characteristic))),
+    mutate(Characteristic = gsub("(\\*)|(/a)|(,b)","",iconv(ifelse(is.na(Characteristic), ...3, Characteristic), "UTF-8","ASCII",sub="-")),
            Category = case_when(
              Characteristic == "All released prisoners" ~ "Combined",
              Characteristic %in% c("Male","Female") ~ "Gender",
@@ -152,8 +189,16 @@ process_recidivism <- function(rtype = c("rearrested","reconvicted","reimprisone
   recidiv_stats_long <- recidiv_stats %>%
     select(-matches("[0-9]$")) %>%
     pivot_longer(cols = ends_with("RR")) %>%
-    mutate(Year = as.numeric(gsub("_RR","",gsub("Year ","",name)))) %>%
-    filter(Category != "Combined")
+    mutate(Year = as.numeric(gsub("_RR","",gsub("Year ","",name))))
+  
+  recidiv_comb <- recidiv_stats %>% 
+    ungroup() %>%
+    filter(Category == "Combined") %>%
+    pivot_longer(matches("^Year [0-9]$"), names_to = "Year", 
+                 values_to = "Recidiv_2012", 
+                 names_transform = ~as.numeric(gsub("Year ","",.))) %>%
+    select(Year, Recidiv_2012)
+  recidiv_stats_long <- recidiv_stats_long %>% filter(Category != "Combined")
   
   if(F){
     ## QA plots
@@ -249,32 +294,80 @@ process_recidivism <- function(rtype = c("rearrested","reconvicted","reimprisone
   
   base_rates_by_year <- time_to_recidiv %>%
     mutate(Year = `Time to rearrest (in months)`/12) %>%
-    merge(rr_by_year) 
-  base_rates_by_year$Ref_Recidiv <- base_rates_by_year[[cname]] / base_rates_by_year$RR_wt
+    merge(rr_by_year) %>%
+    merge(recidiv_comb)
+  base_rates_by_year$Recidiv_new05 <- tail(c(0,base_rates_by_year[[cname]]) - lag(c(0,base_rates_by_year[[cname]]), 1), -1)
+  base_rates_by_year$Recidiv_new12 <- tail(c(0,base_rates_by_year$Recidiv_2012) - lag(c(0,base_rates_by_year$Recidiv_2012), 1), -1)
   print(range(base_rates_by_year$RR_wt))
   
-  time_to_recidiv <- time_to_recidiv %>% 
-    arrange(`Time to rearrest (in months)`)
-  time_to_recidiv$Recidiv_new <- time_to_recidiv[[cname]] - lag(time_to_recidiv[[cname]], 1)
+  df_base = time_to_recidiv %>% select(`Time to rearrest (in months)`) %>% 
+    mutate(cohort = "2005") %>%
+    bind_rows(time_to_recidiv08 %>% 
+                select(`Time to rearrest (in months)`) %>% 
+                mutate(cohort = "2008"))
+  df_base$cum.recidivism = c(time_to_recidiv[[cname]], time_to_recidiv08[[cname]])
+  df_base = bind_rows(df_base, 
+                      base_rates_by_year %>% 
+                        rename(cum.recidivism = Recidiv_2012) %>%
+                        select(`Time to rearrest (in months)`, cum.recidivism) %>%
+                        mutate(cohort = "2012")) %>%
+    rename(Month = `Time to rearrest (in months)`) %>%
+    mutate(cum.recidivism = cum.recidivism / 100) %>%
+    filter(Month > 0)
   
-  # exponential function
-  my.formula <- log(Recidiv_new) ~ `Time to rearrest (in months)`
-  m=lm(my.formula, time_to_recidiv)
-  coef(m)
+  formula.init <- cum.recidivism ~ SSmicmen(Month, Vm, K)
+  m.init <- nls(formula.init, df_base, subset = cohort == "2005")
   
-  ypred <- predict(m, tibble(`Time to rearrest (in months)` = 1:60))
-  mpred <- tibble(`Time to rearrest (in months)` = 1:60, Recidiv_new = exp(ypred))
+  formula.m <- cum.recidivism ~ (Vm1*as.numeric(cohort == "2005") + Vm2*as.numeric(cohort == "2008") + Vm3*as.numeric(cohort == "2012")) * Month/(K+Month)
+  m <- nls(formula.m, df_base, 
+           start = list(Vm1 = coef(m.init)[["Vm"]], 
+                        Vm2 = coef(m.init)[["Vm"]], 
+                        Vm3 = coef(m.init)[["Vm"]], 
+                        K = coef(m.init)[["K"]]))
   
-  ggplot(time_to_recidiv, 
-         aes(x = `Time to rearrest (in months)`, y = Recidiv_new)) + 
+  mpred <- tibble(Month = rep(1:60, 3), cohort = sort(rep(c("2005","2008","2012"), 60)))
+  mpred$cum.recidivism <- predict(m, mpred)
+  ggplot(df_base,
+         aes(x = Month, y = cum.recidivism, color = cohort)) +
     geom_line() +
     geom_line(data = mpred,
-              colour = "red") +
+              linetype = "dashed") +
     theme_classic(base_size = 14) +
     labs(y = "New reincarcerations (%)", color = NULL)
   
+  recidiv.fitted <- mpred %>%
+    filter(cohort == "2012") %>%
+    arrange(Month) %>%
+    mutate(p.recidivism = 100*coalesce(cum.recidivism - lag(cum.recidivism, 1), first(cum.recidivism)))
+
+  # time_to_recidiv <- time_to_recidiv %>% 
+  #   arrange(`Time to rearrest (in months)`)
+  # time_to_recidiv$Recidiv_new <- time_to_recidiv[[cname]] - lag(time_to_recidiv[[cname]], 1)
+  # 
+  # # exponential function
+  # time_to_recidiv <- time_to_recidiv %>% filter(!is.na(Recidiv_new)) %>% 
+  #   mutate(Month = `Time to rearrest (in months)`)
+  # formula.m <- Recidiv_new ~ SSasymp(Month, Asym, R0, lrc)
+  # m=nls(formula.m, time_to_recidiv)
+  # 
+  # ypred <- predict(m, tibble(Month = 1:60))
+  # mpred <- tibble(Month = 1:60, Recidiv_new = ypred)
+  # 
+  # ggplot(time_to_recidiv, 
+  #        aes(x = Month, y = Recidiv_new)) + 
+  #   geom_line() +
+  #   geom_line(data = mpred,
+  #             colour = "red") +
+  #   theme_classic(base_size = 14) +
+  #   labs(y = "New reincarcerations (%)", color = NULL)
+  # 
+  # plot(1:60,as.numeric(residuals(m)))
+  # abline(0,0)
+  
   time_to_recidiv <- time_to_recidiv %>%
-    left_join(mpred %>% rename(Recidiv_newS = Recidiv_new)) %>%
+    left_join(recidiv.fitted %>% select(-c(cohort, cum.recidivism)) %>%
+                rename(Recidiv_newS = p.recidivism), 
+              by = c("Time to rearrest (in months)"="Month")) %>%
     mutate(Ref_Recidiv_newS = Recidiv_newS / mean(base_rates_by_year$RR_wt))
   
   if(F){
@@ -301,26 +394,66 @@ process_recidivism <- function(rtype = c("rearrested","reconvicted","reimprisone
   x <- expand.grid(1:nrow(rr_expanded_avg),1:nrow(recid_by_month))
   rr_combined <- cbind(rr_expanded_avg[x[,1],], recid_by_month[x[,2],]) %>%
     mutate(p.recidivism = Recidiv_ref * RR / 100,
-           recidivism_type = rtype) %>%
-    select(-c(RR, Recidiv_ref,pPopulation))
+           recidivism_type = rtype) # %>%
+    # select(-c(RR, Recidiv_ref,pPopulation))
   
-  return(rr_combined)
+  recidiv_comb <- recidiv_comb %>%
+    mutate(group = "raw") %>%
+    bind_rows(recidiv.fitted %>% 
+                mutate(Recidiv_2012 = cum.recidivism*100, group = "predicted") %>% 
+                select(Month, Recidiv_2012, group)) %>%
+    mutate(recidivism_type = rtype)
+  
+  return(list(rr = rr_combined, 
+              raw = recidiv_comb))
 }
 
 df_rearrested <- process_recidivism("rearrested")
 df_reconvicted <- process_recidivism("reconvicted")
-df_reimprisoned <- process_recidivism("reimprisoned")
+df_return <- process_recidivism("return to prison")
 
-df_recidivism <- bind_rows(df_rearrested, df_reconvicted, df_reimprisoned)
+df_recidivism <- bind_rows(df_rearrested$rr, df_reconvicted$rr, df_return$rr)
+df_raw <- bind_rows(df_rearrested$raw, df_reconvicted$raw, df_return$raw)
 
-write_csv(df_recidivism, file.path(here::here(), "data","recidisivm_byTypeSexRaceAge.csv"))
+# Check totals to see if it aligns with original dataset
+df_agg <- df_recidivism %>% 
+  group_by(recidivism_type,Month) %>% 
+  summarize(p.recidivism = sum(p.recidivism*pPopulation)) %>% ungroup() %>%
+  arrange(recidivism_type, Month) %>%
+  group_by(recidivism_type) %>%
+  mutate(cum.recidivism = cumsum(p.recidivism))
+
+df_plot <- bind_rows(time_to_recidiv_long %>% mutate(cohort = "2005"),
+                     time_to_recidiv_long08 %>% mutate(cohort = "2008"),
+                     df_raw %>% 
+                       filter(group == "raw") %>%
+                       mutate(Month = Year * 12, cum.recidivism = Recidiv_2012/100, cohort = "2012"),
+                     df_agg %>% mutate(cohort = "2012 (fitted)")
+                     ) %>% select(Month, recidivism_type, cum.recidivism, cohort)
+df_plot <- df_plot %>% expand(recidivism_type, cohort) %>% mutate(Month = 0, cum.recidivism = 0) %>% # add zeros
+  bind_rows(df_plot) %>%
+  distinct() 
+
+g <- ggplot(df_plot %>% 
+              mutate(cohort = relevel(factor(cohort), ref = "2012 (fitted)")),
+            aes(x = Month, y = cum.recidivism, color = recidivism_type)) + 
+  geom_line(aes(linewidth = cohort)) +
+  scale_linewidth_manual(values = c(1, rep(0.25, 3))) +
+  geom_point(data = df_plot %>% filter(!grepl("fitted", cohort)), aes(shape = cohort), size = 1.5) + 
+  theme_classic()
+
+ggsave(g, file = file.path(here::here(), "preprocess","figs","recidisivm_agg.pdf"), width = 10, height = 6)
+
+write_csv(df_recidivism %>% select(-c(pPopulation, RR, Recidiv_ref)), 
+          file.path(here::here(), "data","recidisivm_byTypeSexRaceAge.csv"))
 
 g <- ggplot(df_recidivism, 
             aes(x = Month, y = p.recidivism, color = Race, linetype = Gender)) + 
   geom_line() + 
   scale_y_continuous("Monthly recidivism rate (%)", label = scales::percent) +
   facet_grid(recidivism_type~Age) +
-  theme_classic(base_size = 14)
+  theme_classic(base_size = 14) +
+  guides(linewidth = NULL)
 
 ggsave(g, file = file.path(here::here(), "preprocess","figs","recidisivm.pdf"), width = 10, height = 8)
 
