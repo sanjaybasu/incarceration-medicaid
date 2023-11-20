@@ -34,43 +34,23 @@ aggVars <- list(
 #   any refers to diagnoses by a medical provider at any point in time
 #   current refers to a provider telling a patient they currently have the disease
 analysisVars <- list(
-  cvd_any = "V1229",
-  cvd_current = "V1244",
+  cvd = "V1229",
   
-  hypertension_any = "V1226" ,
-  hypertension_current = "V1241",
+  hypertension = "V1226" ,
   
-  diabetes_any = "V1228",
-  diabetes_current = "V1243",
+  diabetes = "V1228",
   
-  kidney_any = "V1230",
-  kidney_current = "V1245",
+  kidney = "V1230",
   
-  #note no copd
-  asthma_any = "V1232",
-  asthma_current = "V1247",
+  asthma = "V1232",
   
-  cancer_any = "V1225",
-  cancer_current = "V1240",
+  stroke = "V1227",
+
+  hepB = "V1235",
+
+  hepC = "V1236",
   
-  stroke_any = "V1227",
-  stroke_current = "V1242", #currently experiencing problems from
-  
-  liver_any = "V1233",
-  liver_current = "V1248",
-  
-  autoimmune_any = "V1231",
-  autoimmune_current = "V1246", #arthritis/gout/lupus/fibromyalgia
-  
-  hepB_any = "V1235",
-  hepB_current = "V1249",
-  
-  hepC_any = "V1236",
-  hepC_current = "V1250",
-  
-  hiv_any = "V1237",
-  stdOther_any = "V1238",
-  tb_any = "V1234",
+  depression = "V1186",
   
   # health insurance related measures
   #   these reflect insurance status during the 30 days prior to arrest
@@ -81,13 +61,10 @@ analysisVars <- list(
   
   #Govt assistance measures
   publicAssistance_30d = "V1151", #on public assistance during 30 days prior to arrest
-  publicAssistance_child = "V1170", # was on public assistance as child
   va_eligible = "V1164",
   
   #other
-  homeless_12m = "V0961",
-  homeless_30d = "V0958",
-  homeless_child = "V1165"
+  homeless_12m = "V0961"
 )
 
 #any 'yes' to: AUD1, any of AUD10-21
@@ -166,6 +143,10 @@ aggVarsShort = c(aggVars[names(aggVars) %in%c("ageCat","sex")], raceEthnicity = 
 aggForm = reformulate(aggVarsShort)
 colForm = reformulate(colVars)
 
+dat_n <- spiData2 %>%
+  group_by(across(all_of(unname(aggVarsShort)))) %>%
+  summarize(n = n(), neff = sum(V1585)^2/sum(V1585^2)) # Kish's Effective Sample Size
+
 getSurveyStats <- function(cname){
   require(dplyr)
   require(survey)
@@ -175,12 +156,39 @@ getSurveyStats <- function(cname){
                     FUN = svyciprop, 
                     vartype="ci",
                     method="beta",
+                    keep.var = T,
                     keep.names = F
   ) %>% as.data.frame() %>%
     mutate(health_outcome = cname) %>%
-    rename(lwr = ci_l, upr = ci_u)
-  df$mean = df[[cname]]
+    rename(p.lwr = ci_l, p.upr = ci_u)
+  df$p = df[[cname]]
   df[[cname]] = NULL
+  
+  df2 <- svyby(reformulate(cname), 
+              by=aggForm, 
+              design = spi_svy, 
+              FUN = svymean, 
+              vartype="se",
+              method="beta",
+              keep.var = T,
+              keep.names = F
+  ) %>% as.data.frame()
+  df2[[cname]] <- NULL
+  
+  df <- df %>%
+    left_join(df2) %>%
+    left_join(dat_n) %>%
+    mutate(
+      p.lwr = case_when(
+        p == 0 ~ 0, 
+        p == 1 ~ pmax(0, 1-3/neff), # Rule of 3
+        T ~ p.lwr),
+      p.upr = case_when(
+        p == 0 ~ pmin(1, 3/neff),
+        p == 1 ~ 1,
+        T ~ p.upr
+      )
+    )
   return(df)
 }
 
@@ -189,7 +197,6 @@ library(future.apply)
 plan(multisession, workers = parallel::detectCores()-1) ## Parallelize using five cores
 rm(spiData)
 rm(da37692.0001)
-rm(spiData2)
 
 aggStats <- bind_rows(future_lapply(unname(colVars), getSurveyStats))
 
@@ -217,7 +224,7 @@ saveCrossPlots <- function(plotVars, filename){
                 filter(health_outcome %in% plotVars) %>%
                 mutate(health_outcome = factor(health_outcome, levels = plotVars)),
               aes(x = ageCat, 
-                  y = mean, ymin = lwr, ymax = upr,
+                  y = p, ymin = p.lwr, ymax = p.upr,
                   color = sex, fill = sex, group = sex)) +
     geom_line() +
     scale_y_continuous("Population (%)", labels = scales::percent, expand = c(0,0),
@@ -230,14 +237,12 @@ saveCrossPlots <- function(plotVars, filename){
   ggsave(filename, g, width = 10, height = 10)
 }
 
-plotVars <- names(colVars)[!grepl("_current", names(colVars))]
-plotVars <- c(plotVars[1:5], tail(plotVars, 3), head(tail(plotVars, -5), -3))
+plotVars <- names(colVars)
 
 savedir = file.path(here::here(), "preprocess","figs")
 saveCrossPlots(plotVars[1:6], file.path(savedir,"med1.pdf"))
 saveCrossPlots(plotVars[7:12], file.path(savedir,"med2.pdf"))
 saveCrossPlots(plotVars[13:18], file.path(savedir,"med3.pdf"))
-saveCrossPlots(plotVars[19:26], file.path(savedir,"med4.pdf"))
 
 aggStats <- aggStats %>%
   relocate(health_outcome, .after = last_col())

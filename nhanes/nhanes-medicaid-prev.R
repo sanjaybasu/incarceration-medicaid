@@ -71,129 +71,45 @@ NHANES <- subset(NHANES_all, inAnalysis)
 # Define a function to call svymean and unweighted count
 getSummary <- function(varformula, byformula, design){
   # Get mean, stderr, and unweighted sample size
-  c <- svyby(varformula, byformula, design, unwtd.count,na.rm.all=T , na.rm.by=T, na.rm=TRUE) 
-  p <- svyby(varformula, byformula, design, svymean, na.rm.all=T , na.rm.by=T, na.rm=TRUE) 
-  outSum <- left_join(select(c,-se), p) 
-  outSum
+  df.c <- svyby(varformula, byformula, design, unwtd.count,na.rm.all=T , na.rm.by=T, keep.names = F, na.rm=TRUE) %>% as.data.frame() %>% 
+    select(-se) %>% rename(n = counts)
+  df.p <- svyby(varformula, byformula, design, 
+             FUN = svyciprop, 
+             vartype="ci",
+             method="beta",
+             keep.var = T,
+             keep.names = F, 
+             na.rm.all=T , na.rm.by=T, na.rm=TRUE)  %>% as.data.frame() %>%
+    rename(p.lwr = ci_l, p.upr = ci_u)
+  df.p$p <- df.p[[as.character(varformula)[2]]]
+  df.p[[as.character(varformula)[2]]] <- NULL
+  df.p$health_outcome <- as.character(varformula)[2]
+  
+  vars.g <- labels(terms(byformula))
+  df.v <- svyby(varformula, byformula, design, 
+             FUN = svymean, 
+             vartype="se",
+             method="beta",
+             keep.var = T,
+             keep.names = F, 
+             na.rm.all=T , na.rm.by=T, na.rm=TRUE)  %>% as.data.frame() %>%
+    select(!!vars.g, tail(names(.), 1))
+  var.se <- tail(colnames(df.v), 1)
+  df.v$se <- df.v[[var.se]]
+  df.v[[var.se]] <- NULL
+  
+  outSum <- left_join(df.c, df.p) %>% left_join(df.v)
+  return(outSum)
 }
 
+health_outcomes <- c("cvd","str","htn","dm","ast","ckd","hbv","hcv","dep")
+groups <- c("one","Gender","Age.Group","Race","Gender + Age.Group + Race")
 
-#' ### Calculate prevalence overall, by gender, by age group, and by age and gender
-# Overall
-cvd_overall=write_csv(getSummary(~cvd, ~one, NHANES),"cvd_overall.csv")
-#' By sex
-cvd_sex=write_csv(getSummary(~cvd, ~Gender, NHANES),"cvd_sex.csv")
-#' By age
-cvd_age=write_csv(getSummary(~cvd, ~Age.Group, NHANES),"cvd_age.csv")
-#' By race
-cvd_race=write_csv(getSummary(~cvd, ~Race, NHANES),"cvd_race.csv")
-#' By sex and age and race
-cvd_all=write_csv(getSummary(~cvd, ~Gender + Age.Group + Race, NHANES),"cvd_all.csv")
-
-
-
-#' ### Calculate prevalence overall, by gender, by age group, and by age and gender
-# Overall
-str_overall=write_csv(getSummary(~str, ~one, NHANES),"str_overall.csv")
-#' By sex
-str_sex=write_csv(getSummary(~str, ~Gender, NHANES),"str_sex.csv")
-#' By age
-str_age=write_csv(getSummary(~str, ~Age.Group, NHANES),"str_age.csv")
-#' By race
-str_race=write_csv(getSummary(~str, ~Race, NHANES),"str_race.csv")
-#' By sex and age and race
-str_all=write_csv(getSummary(~str, ~Gender + Age.Group + Race, NHANES),"str_all.csv")
-
-
-
-#' ### Calculate prevalence overall, by gender, by age group, and by age and gender
-# Overall
-htn_overall=write_csv(getSummary(~htn, ~one, NHANES),"htn_overall.csv")
-#' By sex
-htn_sex=write_csv(getSummary(~htn, ~Gender, NHANES),"htn_sex.csv")
-#' By age
-htn_age=write_csv(getSummary(~htn, ~Age.Group, NHANES),"htn_age.csv")
-#' By race
-htn_race=write_csv(getSummary(~htn, ~Race, NHANES),"htn_race.csv")
-#' By sex and age and race
-htn_all=write_csv(getSummary(~htn, ~Gender + Age.Group + Race, NHANES),"htn_all.csv")
-
-
-# Overall
-dm_overall=write_csv(getSummary(~dm, ~one, NHANES),"dm_overall.csv")
-#' By sex
-dm_sex=write_csv(getSummary(~dm, ~Gender, NHANES),"dm_sex.csv")
-#' By age
-dm_age=write_csv(getSummary(~dm, ~Age.Group, NHANES),"dm_age.csv")
-#' By race
-dm_race=write_csv(getSummary(~dm, ~Race, NHANES),"dm_race.csv")
-#' By sex and age and race
-dm_all=write_csv(getSummary(~dm, ~Gender + Age.Group + Race, NHANES),"dm_all.csv")
-
-
-# Overall
-ast_overall=write_csv(getSummary(~ast, ~one, NHANES),"ast_overall.csv")
-#' By sex
-ast_sex=write_csv(getSummary(~ast, ~Gender, NHANES),"ast_sex.csv")
-#' By age
-ast_age=write_csv(getSummary(~ast, ~Age.Group, NHANES),"ast_age.csv")
-#' By race
-ast_race=write_csv(getSummary(~ast, ~Race, NHANES),"ast_race.csv")
-#' By sex and age and race
-ast_all=write_csv(getSummary(~ast, ~Gender + Age.Group + Race, NHANES),"ast_all.csv")
-
-
-
-# Overall
-ckd_overall=write_csv(getSummary(~ckd, ~one, NHANES),"ckd_overall.csv")
-#' By sex
-ast_sex=write_csv(getSummary(~ckd, ~Gender, NHANES),"ckd_sex.csv")
-#' By age
-ast_age=write_csv(getSummary(~ckd, ~Age.Group, NHANES),"ckd_age.csv")
-#' By race
-ast_race=write_csv(getSummary(~ckd, ~Race, NHANES),"ckd_race.csv")
-#' By sex and age and race
-ast_all=write_csv(getSummary(~ckd, ~Gender + Age.Group + Race, NHANES),"ckd_overall.csv")
-
-
-
-# Overall
-hbv_overall=write_csv(getSummary(~hbv, ~one, NHANES),"hbv_overall.csv")
-#' By sex
-hbv_sex=write_csv(getSummary(~hbv, ~Gender, NHANES),"hbv_sex.csv")
-#' By age
-hbv_age=write_csv(getSummary(~hbv, ~Age.Group, NHANES),"hbv_age.csv")
-#' By race
-hbv_race=write_csv(getSummary(~hbv, ~Race, NHANES),"hbv_race.csv")
-#' By sex and age and race
-hbv_all=write_csv(getSummary(~hbv, ~Gender + Age.Group + Race, NHANES),"hbv_all.csv")
-
-
-
-# Overall
-hcv_overall=write_csv(getSummary(~hcv, ~one, NHANES),"hcv_overall.csv")
-#' By sex
-hcv_sex=write_csv(getSummary(~hcv, ~Gender, NHANES),"hcv_sex.csv")
-#' By age
-hcv_age=write_csv(getSummary(~hcv, ~Age.Group, NHANES),"hcv_age.csv")
-#' By race
-hcv_race=write_csv(getSummary(~hcv, ~Race, NHANES),"hcv_race.csv")
-#' By sex and age and race
-hcv_all=write_csv(getSummary(~hcv, ~Gender + Age.Group + Race, NHANES),"hcv_all.csv")
-
-
-
-# Overall
-dep_overall=write_csv(getSummary(~dep, ~one, NHANES),"dep_overall.csv")
-#' By sex
-dep_sex=write_csv(getSummary(~dep, ~Gender, NHANES),"dep_sex.csv")
-#' By age
-dep_age=write_csv(getSummary(~dep, ~Age.Group, NHANES),"dep_age.csv")
-#' By race
-dep_race=write_csv(getSummary(~dep, ~Race, NHANES),"dep_race.csv")
-#' By sex and age and race
-dep_all=write_csv(getSummary(~dep, ~Gender + Age.Group + Race, NHANES),"dep_all.csv")
-
+for(g in groups){
+  df <- bind_rows(lapply(health_outcomes, 
+                         function(x) getSummary(reformulate(x), reformulate(g), NHANES)))
+  write_csv(df, file.path(here::here(), "data",paste0("nhanes_by", gsub("\\.|\\+| ","",g), ".csv")))
+}
 
 
 
