@@ -2,6 +2,7 @@
 library(nhanesA)
 library(survey)
 library(tidyverse)
+library(tidyr)
 
 # Load the demographic data to obtain the survey weights
 demo_data <- nhanes("P_DEMO")
@@ -67,9 +68,52 @@ NHANES_all <- svydesign(data=One, id=~SDMVPSU, strata=~SDMVSTRA, weights=~WTINTP
 # Subsetting the original survey design object ensures we keep the design information about the number of clusters and strata
 NHANES <- subset(NHANES_all, inAnalysis)
 
+# mod.ni <- svyglm(ast~0+Gender + Age.Group + Race, design=NHANES,
+#        family=quasibinomial())
+# mod.iGA <- svyglm(ast~0+Gender * Age.Group + Race, design=NHANES,
+#                  family=quasibinomial())
+# mod.iAR <- svyglm(ast~0+Gender + Age.Group * Race, design=NHANES,
+#                   family=quasibinomial())
+# mod.iGR <- svyglm(ast~0+Gender * Race + Age.Group, design=NHANES,
+#                   family=quasibinomial())
+# mod.iGAR <- svyglm(ast~0+Gender * Age.Group * Race, design=NHANES,
+#                   family=quasibinomial())
+# AIC(mod.ni, mod.iGA, mod.iAR, mod.iGR, mod.iGAR)
+
+
 #' ## Analysis
 # Define a function to call svymean and unweighted count
 getSummary <- function(varformula, byformula, design){
+  # Fit data
+  byvars <- labels(terms(byformula))
+  varvars <- labels(terms(varformula))
+  
+  print(varvars)
+  
+  if(length(byvars) == 3){
+    mod.ni <- svyglm(reformulate(c(0, "Gender * Age.Group + Race"), response = varvars), 
+                     design=design, family=quasibinomial())
+  } else {
+    mod.ni <- svyglm(reformulate(c(0, paste0(byvars, collapse = "*")), response = varvars), 
+                     design=design, family=quasibinomial())
+  }
+
+  xterms <- labels(terms(mod.ni$terms))
+  x2terms <- setdiff(xterms, names(mod.ni$xlevels))
+  x2terms <- x2terms[!grepl(":", x2terms)]
+  x2levels <- lapply(x2terms, function(x) unique(design$variables[[x]]))
+  names(x2levels) <- x2terms
+  
+  df.combs <- expand.grid(c(x2levels, mod.ni$xlevels))
+  # df.combs <- design$variables %>% tidyr::expand(!!!syms(byvars))
+  y.pred <- predict(mod.ni, newdata = df.combs, se.fit = T, type = "link") %>% as.data.frame()
+  mod.invlink = mod.ni$family$linkinv
+  df.pred <- list(pred = mod.invlink(y.pred$link),
+                pred.upr = mod.invlink(y.pred$link + (qnorm(0.975) * y.pred$SE)),
+                pred.lwr = mod.invlink(y.pred$link - (qnorm(0.975) * y.pred$SE)),
+                pred.se = y.pred$SE
+                ) %>% as.data.frame() %>% bind_cols(df.combs)
+  
   # Get mean, stderr, and unweighted sample size
   df.c <- svyby(varformula, byformula, design, unwtd.count,na.rm.all=T , na.rm.by=T, keep.names = F, na.rm=TRUE) %>% as.data.frame() %>% 
     select(-se) %>% rename(n = counts)
@@ -98,7 +142,7 @@ getSummary <- function(varformula, byformula, design){
   df.v$se <- df.v[[var.se]]
   df.v[[var.se]] <- NULL
   
-  outSum <- left_join(df.c, df.p) %>% left_join(df.v)
+  outSum <- left_join(df.c, df.p) %>% left_join(df.v) %>% left_join(df.pred)
   return(outSum)
 }
 
@@ -111,5 +155,25 @@ for(g in groups){
   write_csv(df, file.path(here::here(), "data",paste0("nhanes_by", gsub("\\.|\\+| ","",g), ".csv")))
 }
 
+#read in last and plot
+df <- read_csv(file = file.path(here::here(), "data",paste0("nhanes_by", gsub("\\.|\\+| ","",g), ".csv")))
+df.pred <- df %>%
+  select(Gender, Age.Group, Race, n, health_outcome, starts_with("pred")) %>%
+  mutate(group = "predicted")
+colnames(df.pred) <- gsub("^pred","p",colnames(df.pred))
+df <- df %>%
+  select(Gender, Age.Group, Race, n, health_outcome, p, p.upr, p.lwr, se) %>%
+  rename(p.se = se) %>%
+  mutate(group = "raw") %>% 
+  bind_rows(df.pred)
 
+for(h in unique(df$health_outcome)){
+  g1 <-   ggplot(df %>% filter(health_outcome == h), 
+                aes(x = Age.Group, y = p, ymax = p.upr, ymin = p.lwr, 
+                    group = group, fill = group, color = group)) +
+    geom_line() + geom_ribbon(alpha = 0.5) +
+    facet_grid(Race ~ Gender) +
+    ggtitle(h)
+  plot(g1)
+}
 

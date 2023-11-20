@@ -52,7 +52,7 @@ comment(df_prisonReleases) <- "Total prison releases. Note there are quite a few
 
 ### Health outcomes incidence by sex, rage, and age
 df_healthOutcomes <- read_csv(file.path(here::here(), "data","healthOutcomes_bySexRaceAge.csv")) %>%
-  rename(sex_gender = sex, race_ethnicity = raceEthnicity, p_outcome_m = mean, p_outcome_lwr = lwr, p_outcome_upr = upr) %>%
+  rename(sex_gender = sex, race_ethnicity = raceEthnicity, p_outcome_m = p, p_outcome_lwr = p.lwr, p_outcome_upr = p.upr, p_outcome_se = se) %>%
   separate(ageCat, c("age_min","age_max"), sep = "-", remove = F) %>%
   mutate(race_ethnicity = case_when(race_ethnicity == "Multiracial, other, or missing" ~ "Other or Unknown",
                                     grepl(" \\(NH\\)", race_ethnicity) ~ gsub(" \\(NH\\)", "", race_ethnicity),
@@ -64,6 +64,21 @@ df_healthOutcomes <- read_csv(file.path(here::here(), "data","healthOutcomes_byS
   ) %>%
   select(-ageCat)
 comment(df_healthOutcomes) <- "Proportion of incarcerated population with a given health outcome by age x sex x race.\nTo get the number of people estimated to a health outcome within each state, multiply the proportions by total releases by state x race x sex x age."
+
+### NHANES Health outcomes incidence by sex, rage, and age
+df_NHANES <- read_csv(file.path(here::here(), "data","nhanes_byGenderAgeGroupRace.csv"))  %>%
+  rename(sex_gender = Gender, race_ethnicity = Race, p_outcome_m = pred, p_outcome_lwr = pred.lwr, p_outcome_upr = pred.upr, p_outcome_se = pred.se) %>%
+  separate(Age.Group, c("age_min","age_max"), sep = "-", remove = F) %>%
+  mutate(race_ethnicity = case_when(race_ethnicity == "Other" ~ "Other or Unknown",
+                                    grepl("^(NH )", race_ethnicity) ~ gsub("^(NH )", "", race_ethnicity),
+                                    T ~ race_ethnicity),
+         age_min = case_when(Age.Group == "65 and over" ~ 65,
+                             !is.na(age_min) ~ as.numeric(age_min)),
+         age_max = case_when(Age.Group == "Under 18" ~ 17,
+                             !is.na(age_max) ~ as.numeric(age_max))
+  ) %>%
+  select(-c(Age.Group, p, p.lwr, p.upr, se))
+comment(df_NHANES) <- "Proportion of Medicaid population with a given health outcome by age x sex x race."
 
 ### Recidivism
 df_recidivism <- read_csv(file.path(here::here(), "data","recidisivm_byTypeSexRaceAge.csv")) %>%
@@ -77,5 +92,5 @@ df_recidivism <- read_csv(file.path(here::here(), "data","recidisivm_byTypeSexRa
   select(-Age)
 comment(df_recidivism) <- "Monthly recidivism rate as a proportion. Time-to-recidivism is defined relative to their first rearrest. Note this is data from prisons only."  
 
-save(df_jailReleases, df_jailStays, df_prisonReleases, df_recidivism, file = file.path(here::here(), "data", "input_standardized.rda"))
+save(df_jailReleases, df_jailStays, df_prisonReleases, df_recidivism, df_healthOutcomes, df_NHANES, file = file.path(here::here(), "data", "input_standardized.rda"))
   

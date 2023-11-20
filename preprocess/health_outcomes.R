@@ -247,6 +247,6 @@ saveCrossPlots(plotVars[13:18], file.path(savedir,"med3.pdf"))
 aggStats <- aggStats %>%
   relocate(health_outcome, .after = last_col())
 
-write_csv(aggStats, file.path(here::here(), "data","healthOutcomes_bySexRaceAge.csv"))
+write_csv(aggStats, file = file.path(here::here(), "data","healthOutcomes_bySexRaceAge.csv"))
 
 
