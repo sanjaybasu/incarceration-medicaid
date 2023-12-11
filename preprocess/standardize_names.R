@@ -103,7 +103,7 @@ df_healthOutcomes <- read_csv(file.path(here::here(), "data","healthOutcomes_byS
 comment(df_healthOutcomes) <- "Proportion of incarcerated population with a given health outcome by age x sex x race.\nTo get the number of people estimated to a health outcome within each state, multiply the proportions by total releases by state x race x sex x age."
 
 ### NHANES Health outcomes incidence by sex, rage, and age
-df_NHANES <- read_csv(file.path(here::here(), "data","nhanes_byGenderAgeGroupRace.csv"))  %>%
+df_nhanes <- read_csv(file.path(here::here(), "data","nhanes_byGenderAgeGroupRace.csv"))  %>%
   rename(race_ethnicity = Race, p_outcome_m = pred, p_outcome_lwr = pred.lwr, p_outcome_upr = pred.upr, p_outcome_se = pred.se) %>%
   separate(Age.Group, c("age_min","age_max"), sep = "-", remove = F) %>%
   mutate(race_ethnicity = case_when(race_ethnicity == "Other" ~ "Other or Unknown",
@@ -117,7 +117,42 @@ df_NHANES <- read_csv(file.path(here::here(), "data","nhanes_byGenderAgeGroupRac
                              !is.na(age_max) ~ as.numeric(age_max))
   ) %>%
   select(-c(Age.Group, Gender, p, p.lwr, p.upr, se))
-comment(df_NHANES) <- "Proportion of Medicaid population with a given health outcome by age x sex x race."
+comment(df_nhanes) <- "Proportion of Medicaid population with a given health outcome by age x sex x race."
+
+df_ami <- read_csv(file.path(here::here(), "data","NSDUH_AMI_Results.csv")) %>%
+  rename(sex_gender = Gender, race_ethnicity = Race, p_outcome_m = amipy, p_outcome_se = se) %>%
+  separate(Age.Group, c("age_min","age_max"), sep = "-", remove = F) %>%
+  mutate(health_outcome = "AMI",
+         sex_gender = case_when(sex_gender == "Men" ~ "Male",
+                                sex_gender == "Women" ~ "Female"),
+         age_min = case_when(Age.Group == "65 and over" ~ 65,
+                             Age.Group == "19-34" ~ 18,
+                             !is.na(age_min) ~ as.numeric(age_min)),
+         age_max = case_when(Age.Group == "Under 18" ~ 17,
+                             !is.na(age_max) ~ as.numeric(age_max)),
+         race_ethnicity = case_when(race_ethnicity == "Other" ~ "Other or Unknown",
+                                    grepl("^(NH )", race_ethnicity) ~ gsub("^(NH )", "", race_ethnicity),
+                                    T ~ race_ethnicity)
+         ) %>% select(-Age.Group)
+
+df_smi <- read_csv(file.path(here::here(), "data","NSDUH_SMI_Results.csv")) %>%
+  rename(sex_gender = Gender, race_ethnicity = Race, p_outcome_m = smipy, p_outcome_se = se) %>%
+  separate(Age.Group, c("age_min","age_max"), sep = "-", remove = F) %>%
+  mutate(health_outcome = "SMI",
+         sex_gender = case_when(sex_gender == "Men" ~ "Male",
+                                sex_gender == "Women" ~ "Female"),
+         age_min = case_when(Age.Group == "65 and over" ~ 65,
+                             Age.Group == "19-34" ~ 18,
+                             !is.na(age_min) ~ as.numeric(age_min)),
+         age_max = case_when(Age.Group == "Under 18" ~ 17,
+                             !is.na(age_max) ~ as.numeric(age_max)),
+         race_ethnicity = case_when(race_ethnicity == "Other" ~ "Other or Unknown",
+                                    grepl("^(NH )", race_ethnicity) ~ gsub("^(NH )", "", race_ethnicity),
+                                    T ~ race_ethnicity)
+  ) %>% select(-Age.Group)
+
+df_nsduh <- bind_rows(df_ami, df_smi)
+comment(df_nsduh) <- "Proportion of Medicaid population with a given health outcome by age x sex x race."
 
 # ### Recidivism
 # df_recidivism <- read_csv(file.path(here::here(), "data","recidisivm_byTypeSexRaceAge.csv")) %>%
@@ -131,5 +166,5 @@ comment(df_NHANES) <- "Proportion of Medicaid population with a given health out
 #   select(-Age)
 # comment(df_recidivism) <- "Monthly recidivism rate as a proportion. Time-to-recidivism is defined relative to their first rearrest. Note this is data from prisons only."  
 
-save(df_jailReleases, df_prisonReleases, df_healthOutcomes, df_NHANES, file = file.path(here::here(), "data", "input_standardized.rda"))
+save(df_jailReleases, df_prisonReleases, df_healthOutcomes, df_nhanes, df_nsduh, file = file.path(here::here(), "data", "input_standardized.rda"))
   
