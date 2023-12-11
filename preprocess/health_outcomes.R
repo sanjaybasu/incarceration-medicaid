@@ -105,7 +105,8 @@ spiData <- spiData %>%
                                        `(4) 4 = Other (NH), single race` = "Multiracial, other, or missing",
                                        `(5) 5 = 2+ Races (NH)` = "Multiracial, other, or missing",
                                        `(9) 9 = Uncategorized - Missing` = "Multiracial, other, or missing"
-                                       )
+                                       ),
+         ageCat2 = cut(RV0001, c(0, 17.5, 34.5, 49.5, 64.5, 100), labels = c("<18","18-34","35-49","50-64","65+"))
   )
 levels(spiData[[aggVars$state]]) <- c(NA, NA, NA, tail(levels(spiData[[aggVars$state]]), -3))
 
@@ -139,7 +140,7 @@ spi_svy <- svrepdesign(
   ) )
 
 aggVars = unlist(aggVars)
-aggVarsShort = c(aggVars[names(aggVars) %in%c("ageCat","sex")], raceEthnicity = "raceEthnicity")
+aggVarsShort = c(ageCat2 = "ageCat2", aggVars[names(aggVars) %in% c( "sex")], raceEthnicity = "raceEthnicity")
 aggForm = reformulate(aggVarsShort)
 colForm = reformulate(colVars)
 

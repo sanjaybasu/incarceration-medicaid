@@ -58,8 +58,7 @@ jdi_data_rosters  <- jdi_data_rosters %>%
   replace_na(list(hispanic = 0))
 
 jdi_data_rosters <- jdi_data_rosters %>%
-  mutate(ageCat = cut(age, breaks = c(0,17,24,34,44,54,64,110), 
-                      labels = c("Under 18","18-24","25-34","35-44","45-54","55-64","65 or Older"))) %>%
+  mutate(ageCat = cut(age, breaks = c(0, 17.5, 34.5, 49.5, 64.5, 100), labels = c("<18","18-34","35-49","50-64","65+"))) %>%
   group_by(state, county) %>%
   mutate(flagF = first_seen == min(first_seen, na.rm = T),
          flagL = last_seen ==  max(last_seen, na.rm = T)) %>% #flag observations that start or end on first or last day of data collection for state + county
@@ -226,7 +225,7 @@ if(F){
   datC <- bind_rows(datC, cbind(pStays, p30 = p30C) %>% mutate(group = "pred"))
   
   dat <- bind_rows(ageEsts %>% mutate(group = "obs"),
-                   cbind(ageEsts %>% select(-p30), p30 = p30) %>% mutate(group = "pred"))
+                   cbind(ageEsts %>% dplyr::select(-p30), p30 = p30) %>% dplyr::mutate(group = "pred"))
   
   dat_wide <- dat %>%
     pivot_wider(id_cols = c(state, raceEthnicity, sex_gender_standardized, ageCat, countyid, nStrata), 
@@ -251,28 +250,28 @@ if(F){
 
 df_comb <- ageEsts %>% 
   expand(state, raceEthnicity, sex_gender_standardized, ageCat) %>%
-  mutate(countyid = NA, nStrata = 1)
+  dplyr::mutate(countyid = NA, nStrata = 1)
 
 npred30 <- predict(mod.n30, newdata = df_comb, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p30.m = fit, p30.se = se.fit)
 npred60 <- predict(mod.n60, newdata = df_comb, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p60.m = fit, p60.se = se.fit)
 npred90 <- predict(mod.n90, newdata = df_comb, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p90.m = fit, p90.se = se.fit)
 
 df_comb <- cbind(df_comb %>% 
-                   select(-nStrata), 
+                   dplyr::select(-nStrata), 
                  npred30, npred60, npred90) %>% 
   dplyr::select(-countyid)
 
 df_comb_long <- df_comb %>%
   dplyr::select(-ends_with(".se")) %>%
   pivot_longer(matches("^p[0-9]"), names_to = "los_cutoff", values_to = "p") %>%
-  mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.m$","",los_cutoff)))) %>%
+  dplyr::mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.m$","",los_cutoff)))) %>%
   left_join(
     df_comb %>%
       dplyr::select(-ends_with(".m")) %>%
       pivot_longer(matches("^p[0-9]"), names_to = "los_cutoff", values_to = "se") %>%
-      mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.se$","",los_cutoff))))
+      dplyr::mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.se$","",los_cutoff))))
   ) %>%
-  mutate(p.m = exp(p), 
+  dplyr::mutate(p.m = exp(p), 
          p.lwr = exp(p - (qnorm(0.975) * se)),
          p.upr = exp(p + (qnorm(0.975) * se)))
 
@@ -281,12 +280,14 @@ states <- unique(df_comb_long$state)
 ageEsts_long <- ageEsts %>%
   group_by(state, raceEthnicity, sex_gender_standardized, ageCat) %>%
   summarise(n30 = sum(n30, na.rm = T), n60 = sum(n60, na.rm = T), n90 = sum(n90, na.rm = T), nStrata = sum(nStrata)) %>%
-  mutate(p30 = n30/nStrata, p60 = n60/nStrata, p90 = n90/nStrata) %>%
-  select(-matches("^n.0$")) %>%
+  dplyr::mutate(p30 = n30/nStrata, p60 = n60/nStrata, p90 = n90/nStrata) %>%
+  dplyr::select(-matches("^n.0$")) %>%
   pivot_longer(starts_with("p"), names_to = "los_cutoff", values_to = "p.raw", names_transform = ~as.numeric(gsub("p","",.)))
 
 df_comb_long <- df_comb_long %>%
   left_join(ageEsts_long)
+
+library(ggplot2)
 
 ggplot(df_comb_long, aes(x = p.raw, y = p.m)) + 
   geom_point(alpha = 0.2) + 
@@ -297,8 +298,6 @@ ggplot(df_comb_long, aes(x = p.raw, y = p.m)) +
 summary(df_comb_long$p.raw - df_comb_long$p.m)
 sd(df_comb_long$p.raw - df_comb_long$p.m, na.rm = T) #within the confidence intervals
 
-
-library(ggplot2)
 
 for(los in c(30, 60, 90)){
   for(s in 1:2){
