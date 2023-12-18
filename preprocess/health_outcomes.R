@@ -50,6 +50,8 @@ analysisVars <- list(
 
   hepC = "V1236",
   
+  hiv = "V1237",
+  
   depression = "V1186",
   
   # health insurance related measures
@@ -78,7 +80,10 @@ mentalHealthVars <- paste0("V", 1185:1191)
 
 load(file.path(data_dir,"DS0001","37692-0001-Data.rda")) # State and Fed prisons
 
-allVars <- unname(unlist(c(tail(aggVars,-1), analysisVars, alcoholUseVars, opioidUseVars, mentalHealthVars)))
+# define SMI as difficulty finding a job b/c of mental health OR hospitalization OR currently getting treatment for mental health
+smiVars <- c("V1091", "V1200", "V1205")
+
+allVars <- unique(unname(unlist(c(tail(aggVars,-1), analysisVars, alcoholUseVars, opioidUseVars, mentalHealthVars, smiVars))))
 
 #replace several responses with NA
 spiData <- da37692.0001 %>% 
@@ -112,6 +117,13 @@ levels(spiData[[aggVars$state]]) <- c(NA, NA, NA, tail(levels(spiData[[aggVars$s
 
 #code mental health any
 spiData$mhDiagnosis_any <- getAny(mentalHealthVars, spiData)
+spiData$ami_any <- getAny(c(mentalHealthVars,smiVars), spiData)
+
+# code SMI
+spiData$smi_any <- getAny(smiVars, spiData)
+
+# code chronic conditions
+spiData$chronic_any <- getAny(unname(unlist(analysisVars[c("cvd","hypertension","diabetes","kidney","asthma","stroke","hepC","hiv")])), spiData)
 
 #code opioid use
 spiData$opioidUse_any = getAny(opioidUseVars, spiData)
@@ -119,7 +131,22 @@ spiData$opioidUse_any = getAny(opioidUseVars, spiData)
 #code alcohol use
 spiData$alcoholUse_any = getAny(alcoholUseVars, spiData)
 
-colVars <- unlist(c(analysisVars, mhDiagnosis_any = "mhDiagnosis_any", opioidUse_any = "opioidUse_any", alcoholUse_any = "alcoholUse_any"))
+# SUD
+spiData$sud_any <- as.numeric(rowSums(spiData[c("alcoholUse_any","opioidUse_any")], na.rm = T) > 0)
+
+# SUD + SMI
+spiData$sud_smi <- as.numeric(rowSums(spiData[c("sud_any","smi_any")], na.rm = T) > 0)
+
+# SUD + MI
+spiData$sud_ami <- as.numeric(rowSums(spiData[c("sud_any","ami_any")], na.rm = T) > 0)
+
+# SUD + MI + chronic
+spiData$sud_ami_chronic <- as.numeric(rowSums(spiData[c("sud_any","ami_any","chronic_any")], na.rm = T) > 0)
+
+colVars <- unlist(c(analysisVars, mhDiagnosis_any = "mhDiagnosis_any", opioidUse_any = "opioidUse_any", alcoholUse_any = "alcoholUse_any",
+                    smi_any = "smi_any", ami_any = "ami_any", chronic_any = "chronic_any", 
+                    sud_any = "sud_any", sud_smi = "sud_smi", sud_ami = "sud_ami", sud_ami_chronic = "sud_ami_chronic"
+                    ))
 
 #all outcomes are binary. replace NA with 0
 spiData2 <- spiData %>%
@@ -148,11 +175,15 @@ dat_n <- spiData2 %>%
   group_by(across(all_of(unname(aggVarsShort)))) %>%
   summarize(n = n(), neff = sum(V1585)^2/sum(V1585^2)) # Kish's Effective Sample Size
 
-getSurveyStats <- function(cname){
+dat_n2 <- spiData2 %>%
+  group_by(V0071, RV0005) %>%
+  summarize(n = n(), neff = sum(V1585)^2/sum(V1585^2)) # Kish's Effective Sample Size
+
+getSurveyStats <- function(cname, agg_form, df_n){
   require(dplyr)
   require(survey)
   df <- svyby(reformulate(cname), 
-                    by=aggForm, 
+                    by=agg_form, 
                     design = spi_svy, 
                     FUN = svyciprop, 
                     vartype="ci",
@@ -166,7 +197,7 @@ getSurveyStats <- function(cname){
   df[[cname]] = NULL
   
   df2 <- svyby(reformulate(cname), 
-              by=aggForm, 
+              by=agg_form, 
               design = spi_svy, 
               FUN = svymean, 
               vartype="se",
@@ -178,7 +209,7 @@ getSurveyStats <- function(cname){
   
   df <- df %>%
     left_join(df2) %>%
-    left_join(dat_n) %>%
+    left_join(df_n) %>%
     mutate(
       p.lwr = case_when(
         p == 0 ~ 0, 
@@ -199,12 +230,15 @@ plan(multisession, workers = parallel::detectCores()-1) ## Parallelize using fiv
 rm(spiData)
 rm(da37692.0001)
 
-aggStats <- bind_rows(future_lapply(unname(colVars), getSurveyStats))
+aggStats <- bind_rows(future_lapply(unname(colVars), function(x) getSurveyStats(x, aggForm, dat_n)))
+aggStats2 <- bind_rows(future_lapply(unname(colVars), function(x) getSurveyStats(x, ~V0071 + RV0005, dat_n2)))
 
 rename_outcomes <- function(x) names(colVars)[colVars == x]
 aggStats$health_outcome <- unname(sapply(aggStats$health_outcome, rename_outcomes))
+aggStats2$health_outcome <- unname(sapply(aggStats2$health_outcome, rename_outcomes))
 
 colnames(aggStats)[1:length(aggVarsShort)] <- names(aggVarsShort)
+colnames(aggStats2)[1:2] <- c("System", "sex")
 
 library(stringr)
 levels(aggStats$ageCat) <- unname(sapply(levels(aggStats$ageCat), 
@@ -218,6 +252,11 @@ levels(aggStats$raceEthnicity) <- unname(sapply(levels(aggStats$raceEthnicity),
                                           }))
 aggStats$raceEthnicity <- factor(aggStats$raceEthnicity, 
                                      levels = c("Hispanic","Black (NH)","White (NH)","Multiracial, other, or missing"))
+
+levels(aggStats2$System) <- unname(sapply(levels(aggStats2$System), 
+                                  function(x) strsplit(x, "= ")[[1]][2]))
+levels(aggStats2$sex) <- unname(sapply(levels(aggStats2$sex), 
+                                      function(x) strsplit(x, "= ")[[1]][2]))
 
 #would not recommend using aggregate stats for public assistance and homelessness data for jails 
 saveCrossPlots <- function(plotVars, filename){
@@ -245,9 +284,30 @@ saveCrossPlots(plotVars[1:6], file.path(savedir,"med1.pdf"))
 saveCrossPlots(plotVars[7:12], file.path(savedir,"med2.pdf"))
 saveCrossPlots(plotVars[13:18], file.path(savedir,"med3.pdf"))
 
+aggStats_systems <- aggStats2 %>% 
+  mutate(System2 = recode(System,
+                         `State correctional authorities such as the state department of corrections` = "State prison",
+                         `Local correctional authorities such as local jails or detention centers` = "Jail",
+                         `Federal Bureau of Prisons` = "Federal prison")) %>%
+  filter(System2 %in% c("State prison","Jail","Federal prison"))
+
+g <- ggplot(aggStats_systems %>% mutate(health_outcome = factor(health_outcome, levels = plotVars)),
+            aes(x = System2, color = sex, group = interaction(System2, sex),
+                y = p, ymin = p.lwr, ymax = p.upr)) +
+  geom_point(position = position_dodge(width=0.5)) +
+  geom_errorbar(width = 0.5, position = position_dodge(width=0.5)) +
+  scale_y_continuous("Population (%)", labels = scales::percent, expand = c(0,0.1),
+                     limits = c(0, NA)) +
+  scale_x_discrete("Correctional system", guide = guide_axis(angle = 45)) +
+  theme_bw() + 
+  facet_wrap( ~ health_outcome, scales = "free")
+
+ggsave(file.path(savedir,"med4.pdf"), g, width = 10, height = 10)
+
 aggStats <- aggStats %>%
   relocate(health_outcome, .after = last_col())
 
 write_csv(aggStats, file = file.path(here::here(), "data","healthOutcomes_bySexRaceAge.csv"))
+write_csv(aggStats_systems, file = file.path(here::here(), "data","healthOutcomes_bySystemSex.csv"))
 
 

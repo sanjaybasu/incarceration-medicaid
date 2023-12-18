@@ -114,7 +114,12 @@ df_nhanes <- read_csv(file.path(here::here(), "data","nhanes_byGenderAgeGroupRac
          age_min = case_when(Age.Group == "65 and over" ~ 65,
                              !is.na(age_min) ~ as.numeric(age_min)),
          age_max = case_when(Age.Group == "Under 18" ~ 17,
-                             !is.na(age_max) ~ as.numeric(age_max))
+                             !is.na(age_max) ~ as.numeric(age_max)),
+         health_outcome = recode(health_outcome,
+                                 ast = "asthma", ckd = "kidney", dm = "diabetes", 
+                                 hbv = "hepB", hcv = "hepC",
+                                 htn = "hypertension", str = "stroke", dep = "depression"
+                                 )
   ) %>%
   select(-c(Age.Group, Gender, p, p.lwr, p.upr, se))
 comment(df_nhanes) <- "Proportion of Medicaid population with a given health outcome by age x sex x race."

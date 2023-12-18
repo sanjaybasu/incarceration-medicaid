@@ -23,6 +23,9 @@ jail.svy <- da38323.0002 %>%
 options(survey.adjust.domain.lonely=TRUE)
 options(survey.lonely.psu="adjust")
 
+state.sex <- jail.svy %>%
+  group_by(STATE) %>%
+  summarize_at(c("RELEASEMALE", "RELEASEFEMALE"), .fun = list(Tot = ~survey_total(., vartype = "se"))) %>% ungroup() 
 state.m <- jail.svy %>%
   group_by(STATE) %>%
   summarize_at(all_of(race_vars), .fun = list(Tot = ~survey_total(coalesce(./RACETOTAL*RELEASEMALE,0), vartype = "se"))) %>%
@@ -33,6 +36,17 @@ state.f <- jail.svy %>%
   mutate(sex = "Female") %>% ungroup()
 
 state_est <- bind_rows(state.m, state.f)
+
+state_long.sex <- state.sex %>%
+  select(-ends_with("_se")) %>%
+  pivot_longer(cols = ends_with("_Tot"), names_to = "sex", names_transform = ~gsub("_Tot","",.), values_to = "Total") %>%
+  left_join(
+    state.sex %>%
+      select(-ends_with("_Tot")) %>%
+      pivot_longer(cols = ends_with("_se"), names_to = "sex", names_transform = ~gsub("_Tot_se","",.), values_to = "se")
+  ) %>%
+  mutate(se = ifelse(se == 0, NA, se),
+         sex = str_to_title(gsub("^RELEASE","",sex)))
 
 state_long.t <- state_est %>%
   select(-ends_with("_se")) %>%
@@ -49,5 +63,6 @@ state_long <- state_long.t %>%
                           ))
 
 write_csv(state_long, file.path(here::here(), "data","jailCensus_byStateSexRace.csv"))
+write_csv(state_long.sex, file.path(here::here(), "data","jailCensus_byStateSex.csv"))
 
 

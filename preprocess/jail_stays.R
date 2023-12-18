@@ -149,6 +149,13 @@ print("Additional number of NAs")
 n_NA <- sum(is.na(jdi_complete$age))
 print(paste0("    Number of individuals with missing age and los >= 30", n_NA, " (", round(100*n_NA/nrow(jdi_complete), 1), "%)"))
 
+losEsts <- jdi_complete %>% 
+  mutate(los30 = as.numeric(los > 29), 
+         los60 = as.numeric(los > 59),
+         los90 = as.numeric(los > 89)) %>%
+  group_by(state, countyid) %>%
+  summarize(n30 = sum(los30), n60 = sum(los60), n90 = sum(los90), nStrata = n()) %>% ungroup()
+
 ageEsts <- jdi_complete %>% 
   filter(!is.na(ageCat), sex_gender_standardized %in% c("Male","Female")) %>%
   mutate(los30 = as.numeric(los > 29), 
@@ -207,6 +214,42 @@ mod.n90 <- glmmTMB(n90~state + raceEthnicity * ageCat + sex_gender_standardized 
                      verbose = F,
                      data=ageEsts)
 
+mod.n30s <- glmmTMB(n30~state + (1|countyid) + offset(log(nStrata)),
+                     ziformula=~1,
+                     family = nbinom2,
+                     verbose = F,
+                     data=losEsts)
+
+mod.n60s <- glmmTMB(n60~state + (1|countyid) + offset(log(nStrata)),
+                    ziformula=~1,
+                    family = nbinom2,
+                    verbose = F,
+                    data=losEsts)
+
+mod.n90s <- glmmTMB(n90~state + (1|countyid) + offset(log(nStrata)),
+                    ziformula=~1,
+                    family = nbinom2,
+                    verbose = F,
+                    data=losEsts)
+
+mod.n30s2 <- glmmTMB(n30~(1|state) + (1|countyid) + offset(log(nStrata)),
+                    ziformula=~1,
+                    family = nbinom2,
+                    verbose = F,
+                    data=losEsts)
+
+mod.n60s2 <- glmmTMB(n60~(1|state) + (1|countyid) + offset(log(nStrata)),
+                    ziformula=~1,
+                    family = nbinom2,
+                    verbose = F,
+                    data=losEsts)
+
+mod.n90s2 <- glmmTMB(n90~(1|state) + (1|countyid) + offset(log(nStrata)),
+                    ziformula=~1,
+                    family = nbinom2,
+                    verbose = F,
+                    data=losEsts)
+
 
 if(F){
   # some visualization to look at fit
@@ -252,13 +295,34 @@ df_comb <- ageEsts %>%
   expand(state, raceEthnicity, sex_gender_standardized, ageCat) %>%
   dplyr::mutate(countyid = NA, nStrata = 1)
 
+df_combs <- losEsts %>%
+  tidyr::expand(state) %>%
+  dplyr::mutate(countyid = NA, nStrata = 1)
+df_combs2 <- df_combs[1,] %>% mutate(state = NA)
+  
+
 npred30 <- predict(mod.n30, newdata = df_comb, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p30.m = fit, p30.se = se.fit)
 npred60 <- predict(mod.n60, newdata = df_comb, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p60.m = fit, p60.se = se.fit)
 npred90 <- predict(mod.n90, newdata = df_comb, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p90.m = fit, p90.se = se.fit)
 
+npred30s <- predict(mod.n30s, newdata = df_combs, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p30.m = fit, p30.se = se.fit)
+npred60s <- predict(mod.n60s, newdata = df_combs, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p60.m = fit, p60.se = se.fit)
+npred90s <- predict(mod.n90s, newdata = df_combs, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p90.m = fit, p90.se = se.fit)
+npred30s2 <- predict(mod.n30s2, newdata = df_combs2, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p30.m = fit, p30.se = se.fit)
+npred60s2 <- predict(mod.n60s2, newdata = df_combs2, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p60.m = fit, p60.se = se.fit)
+npred90s2 <- predict(mod.n90s2, newdata = df_combs2, re.form = NA ,type = "link", se.fit = T) %>% as.data.frame() %>% rename(p90.m = fit, p90.se = se.fit)
+
+
 df_comb <- cbind(df_comb %>% 
                    dplyr::select(-nStrata), 
                  npred30, npred60, npred90) %>% 
+  dplyr::select(-countyid)
+
+df_combs <- cbind(bind_rows(df_combs, df_combs2) %>%
+                    dplyr::select(-nStrata), 
+                 bind_rows(npred30s, npred30s2), 
+                 bind_rows(npred60s, npred60s2), 
+                 bind_rows(npred90s, npred90s2)) %>% 
   dplyr::select(-countyid)
 
 df_comb_long <- df_comb %>%
@@ -275,6 +339,20 @@ df_comb_long <- df_comb %>%
          p.lwr = exp(p - (qnorm(0.975) * se)),
          p.upr = exp(p + (qnorm(0.975) * se)))
 
+df_combs_long <- df_combs %>%
+  dplyr::select(-ends_with(".se")) %>%
+  pivot_longer(matches("^p[0-9]"), names_to = "los_cutoff", values_to = "p") %>%
+  dplyr::mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.m$","",los_cutoff)))) %>%
+  left_join(
+    df_combs %>%
+      dplyr::select(-ends_with(".m")) %>%
+      pivot_longer(matches("^p[0-9]"), names_to = "los_cutoff", values_to = "se") %>%
+      dplyr::mutate(los_cutoff = as.numeric(gsub("^p","",gsub("\\.se$","",los_cutoff))))
+  ) %>%
+  dplyr::mutate(p.m = exp(p), 
+                p.lwr = exp(p - (qnorm(0.975) * se)),
+                p.upr = exp(p + (qnorm(0.975) * se)))
+
 states <- unique(df_comb_long$state)
 
 ageEsts_long <- ageEsts %>%
@@ -284,8 +362,18 @@ ageEsts_long <- ageEsts %>%
   dplyr::select(-matches("^n.0$")) %>%
   pivot_longer(starts_with("p"), names_to = "los_cutoff", values_to = "p.raw", names_transform = ~as.numeric(gsub("p","",.)))
 
+losEsts_long <- losEsts %>%
+  group_by(state) %>%
+  summarise(n30 = sum(n30, na.rm = T), n60 = sum(n60, na.rm = T), n90 = sum(n90, na.rm = T), nStrata = sum(nStrata)) %>%
+  dplyr::mutate(p30 = n30/nStrata, p60 = n60/nStrata, p90 = n90/nStrata) %>%
+  dplyr::select(-matches("^n.0$")) %>%
+  pivot_longer(starts_with("p"), names_to = "los_cutoff", values_to = "p.raw", names_transform = ~as.numeric(gsub("p","",.)))
+
 df_comb_long <- df_comb_long %>%
   left_join(ageEsts_long)
+
+df_combs_long <- df_combs_long %>%
+  left_join(losEsts_long)
 
 library(ggplot2)
 
@@ -295,9 +383,17 @@ ggplot(df_comb_long, aes(x = p.raw, y = p.m)) +
   coord_equal(xlim=c(0,.25),ylim=c(0,.25)) + #bulk of points fall within this range
   theme_classic()
 
+ggplot(df_combs_long, aes(x = p.raw, y = p.m)) + 
+  geom_point(alpha = 0.2) + 
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") + 
+  coord_equal(xlim=c(0,.25),ylim=c(0,.25)) + #bulk of points fall within this range
+  theme_classic()
+
 summary(df_comb_long$p.raw - df_comb_long$p.m)
 sd(df_comb_long$p.raw - df_comb_long$p.m, na.rm = T) #within the confidence intervals
 
+summary(df_combs_long$p.raw - df_combs_long$p.m)
+sd(df_combs_long$p.raw - df_combs_long$p.m, na.rm = T) #within the confidence intervals
 
 for(los in c(30, 60, 90)){
   for(s in 1:2){
@@ -320,7 +416,25 @@ for(los in c(30, 60, 90)){
   }
 }
 
+losEsts_long2 <- losEsts %>%
+  pivot_longer(c(n30, n60, n90)) %>%
+  mutate(p = value/nStrata, los_cutoff = as.numeric(gsub("^n","",name)))
+
+g <- ggplot(df_combs_long, 
+            aes()) +
+  geom_point(aes(x = los_cutoff, y = p.m)) +
+  geom_errorbar(aes(x = los_cutoff, ymin = p.lwr, ymax = p.upr)) + 
+  geom_jitter(data = losEsts_long2, aes(x = los_cutoff, y = p), alpha = 0.5, size = 0.5) +
+  ylab("Proportion of strata (state, sex, race) with los≥n") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  facet_wrap(~state, ncol = 5, scale = "free") +
+  theme_classic()
+
+ggsave(g, filename = file.path(here::here(), "preprocess","figs",paste0("jailStays_los.pdf")),
+       width = 12, height = 16)
+
 write_csv(df_comb_long, file = file.path(here::here(), "data", "jailStays_byStateSexRaceAge.csv"))
+write_csv(df_combs_long, file = file.path(here::here(), "data", "jailStays_byLOS.csv"))
 
 # #multiple imputation
 # 
