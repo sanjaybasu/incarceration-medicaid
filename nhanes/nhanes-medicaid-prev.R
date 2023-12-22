@@ -51,7 +51,8 @@ One <- left_join(demo_data, hiq_data, by="SEQN") %>%
         str = (MCQ160F==1),
         htn = (BPQ020==1),
         dm = (DIQ010==1),
-        ast = (MCQ035==1),
+        ast = case_when(!is.na(MCQ010) & !is.na(MCQ035) & MCQ010 == 1 & MCQ035 == 1 ~ 1,
+                        !is.na(MCQ010) ~ 0),
         ckd = (KIQ022==1),
         hbv = (HEQ010==1),
         hcv = (HEQ030==1),
@@ -67,6 +68,8 @@ NHANES_all <- svydesign(data=One, id=~SDMVPSU, strata=~SDMVSTRA, weights=~WTINTP
 # Create a survey design object for the subset of interest: adults aged 20 and over with a valid depression score 
 # Subsetting the original survey design object ensures we keep the design information about the number of clusters and strata
 NHANES <- subset(NHANES_all, inAnalysis)
+
+NHANES_adults <- subset(NHANES, RIDAGEYR > 17)
 
 # mod.ni <- svyglm(ast~0+Gender + Age.Group + Race, design=NHANES,
 #        family=quasibinomial())
@@ -140,7 +143,7 @@ getSummary <- function(varformula, byformula, design){
     select(!!vars.g, tail(names(.), 1))
   var.se <- tail(colnames(df.v), 1)
   df.v$se <- df.v[[var.se]]
-  df.v[[var.se]] <- NULL
+  if(var.se != "se") df.v[[var.se]] <- NULL
   
   outSum <- left_join(df.c, df.p) %>% left_join(df.v) %>% left_join(df.pred)
   return(outSum)
@@ -153,6 +156,13 @@ for(g in groups){
   df <- bind_rows(lapply(health_outcomes, 
                          function(x) getSummary(reformulate(x), reformulate(g), NHANES)))
   write_csv(df, file.path(here::here(), "data",paste0("nhanes_by", gsub("\\.|\\+| ","",g), ".csv")))
+}
+
+#18+
+for(g in groups){
+  df <- bind_rows(lapply(health_outcomes, 
+                         function(x) getSummary(reformulate(x), reformulate(g), NHANES_adults)))
+  write_csv(df, file.path(here::here(), "data",paste0("nhanes_by", gsub("\\.|\\+| ","",g), "Adults.csv")))
 }
 
 #read in last and plot
