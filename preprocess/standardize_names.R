@@ -168,10 +168,8 @@ df_nhanes <- read_csv(file.path(here::here(), "data","nhanes_byGenderAdults.csv"
   select(-c(Gender, p, p.lwr, p.upr, se)) # Age.Group
 comment(df_nhanes) <- "Proportion of Medicaid population with a given health outcome by age x sex x race."
 
-df_nsduh <- read_csv(file.path(here::here(), "data","NSDUH_AMI_Adults_Results.csv")) %>%
-  mutate(health_outcome = "AMI", p_outcome_m = amipy) %>%
-  bind_rows(read_csv(file.path(here::here(), "data","NSDUH_SMI_Adults_Results.csv")) %>%
-              mutate(health_outcome = "SMI", p_outcome_m = smipy)) %>%
+df_nsduh <- read_csv(file.path(here::here(), "data","NSDUH_Adults_Results.csv")) %>%
+  mutate(p_outcome_m = p) %>%
   rename(sex_gender = Gender, p_outcome_se = se) %>% # race_ethnicity = Race, 
   # separate(Age.Group, c("age_min","age_max"), sep = "-", remove = F) %>%
   mutate(sex_gender = case_when(sex_gender == "Men" ~ "Male",
@@ -184,7 +182,7 @@ df_nsduh <- read_csv(file.path(here::here(), "data","NSDUH_AMI_Adults_Results.cs
          # race_ethnicity = case_when(race_ethnicity == "Other" ~ "Other or Unknown",
          #                            grepl("^(NH )", race_ethnicity) ~ gsub("^(NH )", "", race_ethnicity),
          #                            T ~ race_ethnicity)
-         ) %>% select(-c(smipy, amipy)) #Age.Group
+         ) # %>% select(-c(smipy, amipy, Age.Group)) 
 
 comment(df_nsduh) <- "Proportion of Medicaid population with a given health outcome by sex."
 

@@ -60,9 +60,6 @@ ggsave(file.path(here::here(), "figs", "compare_release_medicaid.pdf"), g, devic
 ggsave(file.path(here::here(), "figs", "compare_release_medicaid.png"), g, width = 14, height = 9)
 
 ## Compare levels of health outcomes
-df_healthOutcomes <- df_healthOutcomes %>%
-  mutate(health_outcome = recode(health_outcome, ami_any = "AMI"))
-
 p_HO_incarc <- df_releases %>%
   filter(!combined_system, is.na(los_cutoff) | los_cutoff == 30) %>%
   left_join(df_healthOutcomes, relationship = "many-to-many") %>%
@@ -99,11 +96,6 @@ p_HO_incarc_total <- df_releases %>%
   mutate(p_outcome = n_outcome/n_releases,
          p_outcome_se = n_outcome_se/n_releases)
 
-
-# Health profiles by race and age group for jails and prisons?
-
-# Restrictions by health types (%?)
-
 ## Should get proportions & CI nationally.
 ## Note, not very variable for prisons (similar age, sex, race distribution), ask Sanjay if they'd expect big age distirubitons between adults
 p_HO_medicaid <- df_nhanes %>%
@@ -117,17 +109,125 @@ p_HO <- bind_rows(p_HO_incarc_total %>% mutate(cohort = "Releasees"),
                                 p_outcome_lwr),
          p_outcome_upr = ifelse(is.na(p_outcome_upr), 
                                 invlink(log(p_outcome) + (qnorm(0.975)*p_outcome_se), type = "log"), 
-                                p_outcome_upr)
+                                p_outcome_upr),
+         health_outcome = recode(health_outcome,
+                                 MPD_month = "Moderate\n(K6: 5-12)",
+                                 SPD_month = "Serious\n(K6: ≥13)",
+                                 mpd = "Moderate\n(K6: 5-12)",
+                                 spd = "Serious\n(K6: ≥13)",
+                                 hepC = "Hepatitis C",
+                                 depression = "Depression",
+                                 asthma = "Asthma", 
+                                 cvd = "Cardiovascular\nDisease", 
+                                 hypertension = "Hypertension", 
+                                 diabetes = "Diabetes", 
+                                 stroke = "Stroke", 
+                                 kidney = "Kidney\nProblems",
+                                 mhDiagnosis_any = "Mental health diagnosis",
+                                 ami_any = "Mental health diagnosis, treatment, or prescription",
+                                 smi_any = "Serious mental illness",
+                                 sud_any = "SUD",
+                                 sud_smi = "SUD or SMI",
+                                 sud_smi_idd = "SUD, SMI,\nor I/DD",
+                                 sud_ami_idd = "SUD, AMI,\nor I/DD",
+                                 sud_ami_idd_chronic = "SUD, AMI, I/DD,\nHIV, Hep C, or\nChronic condition"
+                                 )
          )
 
-ggplot(p_HO %>% filter(health_outcome %in% intersect(unique(p_HO_incarc_total$health_outcome), unique(p_HO_medicaid$health_outcome))),
-       aes(x = health_outcome, y = p_outcome, ymin = p_outcome_lwr, ymax = p_outcome_upr, color = cohort, group = cohort)) +
-  geom_point(position = position_dodge(width=0.45)) +
-  geom_errorbar(position = position_dodge(width=0.45), width = .3) +
-  scale_y_continuous("Population (%)", expand = c(0,0.1), labels = scales::percent_format(accuracy = 1)) +
-  scale_x_discrete("Condition", expand = c(0,0)) +
-  theme_classic(base_size = 14) +
-  facet_wrap(~sex_gender, nrow = 2)
+vars_ho <- c("Moderate\n(K6: 5-12)","Serious\n(K6: ≥13)",
+             "Hypertension","Asthma","Hepatitis C","Cardiovascular\nDisease","Diabetes","Chronic\nKidney\nDisease","Stroke")
+
+library(ggpubr)
+library(grid)
+
+y.pos = -0.05
+y.height = 0.015
+
+g <- ggplot(p_HO %>% 
+              mutate(health_outcome = factor(health_outcome, levels = vars_ho),
+                     sex_gender = factor(sex_gender, levels = c("Male","Female"))
+                     ) %>%
+              filter(!is.na(health_outcome)),
+            aes(x = health_outcome, y = p_outcome)) +
+  geom_point(aes(color = cohort, group = cohort), position = position_dodge(width=0.45)) +
+  geom_errorbar(aes(color = cohort, group = cohort, ymin = p_outcome_lwr, ymax = p_outcome_upr), position = position_dodge(width=0.45), width = .35) +
+  scale_y_continuous("Population (%)", expand = c(0,0), labels = scales::percent_format(accuracy = 1), limits = c(NA,0.5), breaks = seq(0,0.5,0.1)) +
+  scale_x_discrete(NULL) +
+  scale_color_manual(NULL,values = c("#0a92a2","#f37c54")) + 
+  theme_classic(base_size = 14) +  
+  theme(strip.text.x = element_text(hjust = 0, margin=margin(l=0,b=10), size = 16),
+        plot.background = element_blank(),
+        strip.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.spacing = unit(1.5, "lines"),
+        plot.margin = margin(t = 1, r = 0, b = 4, l = 0, unit = "lines"),
+        # axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
+        legend.position = c(0.93,0.95),
+        legend.text=element_text(size=14),
+        legend.key.width = unit(1.5,"cm")
+        ) +
+  annotation_custom(grob = linesGrob(), 
+                    xmin = 0.6, ymin = y.pos, xmax = 2.4, ymax = y.pos) +
+  annotation_custom(grob = linesGrob(), 
+                    xmin = 0.6, ymin = y.pos, xmax = 0.6, ymax = y.pos + y.height) +
+  annotation_custom(grob = linesGrob(), 
+                    xmin = 2.4, ymin = y.pos, xmax = 2.4, ymax = y.pos + y.height) +
+  annotation_custom(grob = linesGrob(), 
+                    xmin = 2.6, ymin = y.pos, xmax = 9.4, ymax = y.pos) +
+  annotation_custom(grob = linesGrob(), 
+                    xmin = 2.6, ymin = y.pos, xmax = 2.6, ymax = y.pos + y.height) +
+  annotation_custom(grob = linesGrob(), 
+                    xmin = 9.4, ymin = y.pos, xmax = 9.4, ymax = y.pos + y.height) +
+  annotation_custom(grob = textGrob("Psychological\ndistress", 
+                                    gp=gpar(col="black", fontsize=13, fontface="bold")), 
+                    xmin = 1.5, ymin = y.pos - 2*y.height, xmax = 1.5, ymax = y.pos - 2*y.height) +
+  annotation_custom(grob = textGrob("Chronic\nconditions", 
+                                    gp=gpar(col="black", fontsize=13, fontface="bold")), 
+                    xmin = 6, ymin = y.pos - 2*y.height, xmax = 6, ymax = y.pos - 2*y.height) +
+  coord_cartesian(clip = "off") +
+  guides(color = guide_legend(override.aes = list(size=3, linewidth = 1))) +
+  facet_wrap(~sex_gender, nrow = 1)
+
+ggsave(file.path(here::here(), "figs", "compare_disease_prevalence.pdf"), g, device = cairo_pdf, width = 20, height = 7)
+ggsave(file.path(here::here(), "figs", "compare_disease_prevalence.png"), g, width = 20, height = 7)
+
+# Restrictions by groups (%?)
+vars_ho <- c("SUD","SUD or SMI","SUD, SMI,\nor I/DD","SUD, AMI,\nor I/DD","SUD, AMI, I/DD,\nHIV, Hep C, or\nChronic condition")
+g <- ggplot(p_HO %>% 
+              mutate(health_outcome = factor(health_outcome, levels = vars_ho),
+                     sex_gender = factor(sex_gender, levels = c("Male","Female")),
+                     p_outcome_upr = pmin(1, p_outcome_upr)
+              ) %>%
+              filter(!is.na(health_outcome), cohort == "Releasees"),
+            aes(x = health_outcome, y = p_outcome)) +
+  geom_point(aes(color = sex_gender, group = sex_gender), position = position_dodge(width=0.45)) +
+  geom_errorbar(aes(color = sex_gender, group = sex_gender, ymin = p_outcome_lwr, ymax = p_outcome_upr), 
+                position = position_dodge(width=0.45), width = .35) +
+  scale_y_continuous("Population (%)", expand = c(0,0), labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  scale_x_discrete(NULL) +
+  scale_color_manual(NULL,values = c("#0b6d64","#6f4fa1")) + 
+  theme_classic(base_size = 14) +  
+  theme(strip.text.x = element_text(hjust = 0, margin=margin(l=0,b=10), size = 16),
+        plot.background = element_blank(),
+        strip.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.spacing = unit(1.5, "lines"),
+        legend.title=element_blank(),
+        legend.background = element_rect(linewidth=0.25, linetype="solid", 
+                                         colour ="black"),
+        legend.margin=margin(c(1,5,5,5)),
+        plot.margin = margin(t = 1, r = 0, b = 1, l = 0, unit = "lines"),
+        legend.position = c(0.92,0.25),
+  ) +
+  coord_cartesian(clip = "off")
+g
+
+ggsave(file.path(here::here(), "figs", "eligibility.pdf"), g, device = cairo_pdf, width = 10, height = 6)
+ggsave(file.path(here::here(), "figs", "eligibility.pdf.png"), g, width = 10, height = 6)
+
+# Health profiles by race and age group for jails and prisons?
 
 
 

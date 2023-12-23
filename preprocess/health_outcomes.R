@@ -42,15 +42,25 @@ analysisVars <- list(
   
   kidney = "V1230",
   
-  asthma = "V1232",
+  asthma = "V1247",
   
   stroke = "V1227",
+  
+  stroke_problems = "V1242",
 
   hepB = "V1235",
 
   hepC = "V1236",
   
   hiv = "V1237",
+  
+  autoimmune = "V1231",
+  
+  liver = "V1233",
+  
+  tb = "V1234",
+  
+  cancer = "V1225",
   
   depression = "V1186",
   
@@ -75,15 +85,27 @@ alcoholUseVars <- c("V1268",paste0("V", 1277:1288))
 #any 'yes' to: DU1d or DU6d or DU8d or DU10d [prior history], with indications of dependence: any of DUD1, DUD2, DUD5, DUD6, or any of DUD11-22
 opioidUseVars <- c("V1294","V1318","V1342", paste0("V135", c(0:1, 4:5)), paste0("V", 1360:1371))
 
-#any 'yes' to: MH7
-mentalHealthVars <- paste0("V", 1185:1191)
+#any 'yes' to: MH7. MH diagnosis (lifetime). Also includes history of hospitalization, prescriptions, and treatment for MH.
+## Prescription (at time of arrest or during incarceration)
+
+mhdiagVars <- paste0("V", 1185:1191)
+
+mhhistVars <- c("V1199","V1201","V1202","V1204")
+
+mhcurrVars <- c("V1203","V1205")
+
+#k6
+k6Vars <- paste0("V",1179:1184)
 
 load(file.path(data_dir,"DS0001","37692-0001-Data.rda")) # State and Fed prisons
 
-# define SMI as difficulty finding a job b/c of mental health OR hospitalization OR currently getting treatment for mental health
-smiVars <- c("V1091", "V1200", "V1205")
+# define SMI as difficulty finding a job b/c of mental health OR hospitalization
+smiVars <- c("V1091", "V1200")
 
-allVars <- unique(unname(unlist(c(tail(aggVars,-1), analysisVars, alcoholUseVars, opioidUseVars, mentalHealthVars, smiVars))))
+# I/DD: attention deficit disorder, learning disability, or enrolled in special education classes + cognitive difficulties
+iddVars <- c(paste0("V0", 942:944))
+
+allVars <- unique(unname(unlist(c(tail(aggVars,-1), analysisVars, alcoholUseVars, opioidUseVars, mhdiagVars, mhhistVars, mhcurrVars, smiVars, k6Vars, iddVars))))
 
 #replace several responses with NA
 spiData <- da37692.0001 %>% 
@@ -112,18 +134,22 @@ spiData <- spiData %>%
                                        `(9) 9 = Uncategorized - Missing` = "Multiracial, other, or missing"
                                        ),
          ageCat2 = cut(RV0001, c(0, 17.5, 34.5, 49.5, 64.5, 100), labels = c("<18","18-34","35-49","50-64","65+"))
-  )
+  ) %>%
+  mutate_at(k6Vars, .funs = ~recode(., 
+                                    `(1) 1 = All of the Time` = 4,
+                                    `(2) 2 = Most of the Time` = 3,
+                                    `(3) 3 = Some of the Time` = 2,
+                                    `(4) 4 = A Little of the Time` = 1,
+                                    `(5) 5 = None of the Time` = 0
+  ))
+
 levels(spiData[[aggVars$state]]) <- c(NA, NA, NA, tail(levels(spiData[[aggVars$state]]), -3))
 
 #code mental health any
-spiData$mhDiagnosis_any <- getAny(mentalHealthVars, spiData)
-spiData$ami_any <- getAny(c(mentalHealthVars,smiVars), spiData)
-
-# code SMI
-spiData$smi_any <- getAny(smiVars, spiData)
+spiData$mhDiagnosis_any <- getAny(mhdiagVars, spiData)
 
 # code chronic conditions
-spiData$chronic_any <- getAny(unname(unlist(analysisVars[c("cvd","hypertension","diabetes","kidney","asthma","stroke","hepC","hiv")])), spiData)
+spiData$chronic_any <- getAny(unname(unlist(analysisVars[c("cvd","hypertension","diabetes","kidney","asthma","stroke","hepC","hiv","autoimmune", "liver", "tb","cancer")])), spiData)
 
 #code opioid use
 spiData$opioidUse_any = getAny(opioidUseVars, spiData)
@@ -131,21 +157,43 @@ spiData$opioidUse_any = getAny(opioidUseVars, spiData)
 #code alcohol use
 spiData$alcoholUse_any = getAny(alcoholUseVars, spiData)
 
+# I/DD
+spiData$idd_any <- getAny(iddVars, spiData)
+
+# K6
+spiData$K6 <- as.numeric(rowSums(spiData[k6Vars], na.rm = T))
+
+spiData$SPD = as.numeric(spiData$K6 > 12)
+
+spiData$MPD = as.numeric(between(spiData$K6, 4.5, 12.5))
+
+# Mental health
+## SMI
+spiData$smi_any <- getAny(c(smiVars,"SPD"), spiData)
+
+## AMI
+spiData$ami_any <- getAny(c(mhdiagVars, mhhistVars, mhcurrVars,"MPD",smiVars,"SPD"), spiData)
+
 # SUD
 spiData$sud_any <- as.numeric(rowSums(spiData[c("alcoholUse_any","opioidUse_any")], na.rm = T) > 0)
 
 # SUD + SMI
 spiData$sud_smi <- as.numeric(rowSums(spiData[c("sud_any","smi_any")], na.rm = T) > 0)
 
-# SUD + MI
-spiData$sud_ami <- as.numeric(rowSums(spiData[c("sud_any","ami_any")], na.rm = T) > 0)
+# SUD + SMI + IDD
+spiData$sud_smi_idd <- as.numeric(rowSums(spiData[c("sud_any","smi_any","idd_any")], na.rm = T) > 0)
+
+# SUD + AMI + IDD
+spiData$sud_ami_idd <- as.numeric(rowSums(spiData[c("sud_any","ami_any","idd_any")], na.rm = T) > 0)
 
 # SUD + MI + chronic
-spiData$sud_ami_chronic <- as.numeric(rowSums(spiData[c("sud_any","ami_any","chronic_any")], na.rm = T) > 0)
+spiData$sud_ami_idd_chronic <- as.numeric(rowSums(spiData[c("sud_any","ami_any","idd_any","chronic_any")], na.rm = T) > 0)
 
 colVars <- unlist(c(analysisVars, mhDiagnosis_any = "mhDiagnosis_any", opioidUse_any = "opioidUse_any", alcoholUse_any = "alcoholUse_any",
-                    smi_any = "smi_any", ami_any = "ami_any", chronic_any = "chronic_any", 
-                    sud_any = "sud_any", sud_smi = "sud_smi", sud_ami = "sud_ami", sud_ami_chronic = "sud_ami_chronic"
+                    idd_any = "idd_any", smi_any = "smi_any", ami_any = "ami_any", chronic_any = "chronic_any", 
+                    sud_any = "sud_any", sud_smi = "sud_smi",  sud_smi_idd = "sud_smi_idd", sud_ami_idd = "sud_ami_idd", 
+                    sud_ami_idd_chronic = "sud_ami_idd_chronic",
+                    spd = "SPD", mpd = "MPD"
                     ))
 
 #all outcomes are binary. replace NA with 0
