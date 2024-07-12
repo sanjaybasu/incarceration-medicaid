@@ -53,6 +53,7 @@ rsconnect/
 
 # raw data folder
 data/raw/
+data/old/
 
 # Rproject files
 *.Rproj

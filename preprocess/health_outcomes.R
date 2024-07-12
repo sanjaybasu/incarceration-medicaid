@@ -27,7 +27,8 @@ aggVars <- list(
   sex = "RV0005",
   raceEthnicity6 = "RV0003",
   raceEthnicity5 = "RV0003B",
-  state = "V0772"
+  state = "V0772",
+  system = "V0071"
 )
 
 #health outcomes
@@ -200,8 +201,11 @@ colVars <- unlist(c(analysisVars, mhDiagnosis_any = "mhDiagnosis_any", opioidUse
 spiData2 <- spiData %>%
   mutate_at(all_of(unname(unlist(analysisVars))), .funs = ~coalesce(2-as.integer(.),0))
 
+levels(spiData2$V0071) <- c(levels(spiData2$V0071)[1:3], rep(NA, 3))
+
 #include survey replicates
 library(survey)
+library(jtools)
 
 repwts <- paste0("V", 1586:1949)
 spi_svy <- svrepdesign(
@@ -215,49 +219,83 @@ spi_svy <- svrepdesign(
   ) )
 
 aggVars = unlist(aggVars)
-aggVarsShort = c(ageCat2 = "ageCat2", aggVars[names(aggVars) %in% c( "sex")], raceEthnicity = "raceEthnicity")
-aggForm = reformulate(aggVarsShort)
 colForm = reformulate(colVars)
-
-dat_n <- spiData2 %>%
-  group_by(across(all_of(unname(aggVarsShort)))) %>%
-  summarize(n = n(), neff = sum(V1585)^2/sum(V1585^2)) # Kish's Effective Sample Size
 
 dat_n2 <- spiData2 %>%
   group_by(V0071, RV0005) %>%
   summarize(n = n(), neff = sum(V1585)^2/sum(V1585^2)) # Kish's Effective Sample Size
 
-getSurveyStats <- function(cname, agg_form, df_n){
+# Age stats by sex
+age.mean <- svyby(~RV0001, ~RV0005, spi_svy, na.rm = TRUE, svymean)
+age.sd.m <- svysd(~RV0001, subset(spi_svy, RV0005 == "(1) 1 = Male") , na.rm = TRUE)
+age.sd.f <- svysd(~RV0001, subset(spi_svy, RV0005 == "(2) 2 = Female") , na.rm = TRUE)
+
+print(age.mean)
+print(age.sd.m)
+print(age.sd.f)
+
+getSummary <- function(cname, byformula, df_n){
   require(dplyr)
   require(survey)
-  df <- svyby(reformulate(cname), 
-                    by=agg_form, 
-                    design = spi_svy, 
-                    FUN = svyciprop, 
-                    vartype="ci",
-                    method="beta",
-                    keep.var = T,
-                    keep.names = F
-  ) %>% as.data.frame() %>%
-    mutate(health_outcome = cname) %>%
+  
+  # Fit data
+  byvars <- labels(terms(byformula))
+  varvars <- cname
+  varformula <- reformulate(cname)
+  
+
+  mod.ni <- svyglm(reformulate(c(0, paste0(byvars, collapse = "+")), response = varvars), 
+                     design=spi_svy, family=quasibinomial())
+  
+  xterms <- labels(terms(mod.ni$terms))
+  x2terms <- setdiff(xterms, names(mod.ni$xlevels))
+  x2terms <- x2terms[!grepl(":", x2terms)]
+  x2levels <- lapply(x2terms, function(x) unique(spi_svy$variables[[x]]))
+  names(x2levels) <- x2terms
+  
+  df.combs <- expand.grid(c(x2levels, mod.ni$xlevels))
+  
+  SE.svystat<-function(object,...){
+    v<-vcov(object)
+    if (!is.matrix(v) || NCOL(v)==1) sqrt(v) else sqrt(diag(v))
+  }
+  
+  fit.pred <- predict(mod.ni, newdata = df.combs, se.fit = T, type = "link")
+  y.pred <- as.data.frame(list(link = as.vector(fit.pred), SE = SE.svystat(fit.pred)))
+  mod.invlink = mod.ni$family$linkinv
+  df.pred <- list(pred = mod.invlink(y.pred$link),
+                  pred.upr = mod.invlink(y.pred$link + (qnorm(0.975) * y.pred$SE)),
+                  pred.lwr = mod.invlink(y.pred$link - (qnorm(0.975) * y.pred$SE)),
+                  pred.se = y.pred$SE
+  ) %>% as.data.frame() %>% bind_cols(df.combs)
+  
+  # Get mean, stderr
+  df.p <- svyby(varformula, byformula, spi_svy, 
+                FUN = svyciprop, 
+                vartype="ci",
+                method="beta",
+                keep.var = T,
+                keep.names = F, 
+                na.rm.all=T , na.rm.by=T, na.rm=TRUE)  %>% as.data.frame() %>%
     rename(p.lwr = ci_l, p.upr = ci_u)
-  df$p = df[[cname]]
-  df[[cname]] = NULL
+  df.p$p <- df.p[[as.character(varformula)[2]]]
+  df.p[[as.character(varformula)[2]]] <- NULL
+  df.p$health_outcome <- as.character(varformula)[2]
   
-  df2 <- svyby(reformulate(cname), 
-              by=agg_form, 
-              design = spi_svy, 
-              FUN = svymean, 
-              vartype="se",
-              method="beta",
-              keep.var = T,
-              keep.names = F
-  ) %>% as.data.frame()
-  df2[[cname]] <- NULL
+  vars.g <- labels(terms(byformula))
+  df.v <- svyby(varformula, byformula, spi_svy, 
+                FUN = svymean, 
+                vartype="se",
+                method="beta",
+                keep.var = T,
+                keep.names = F, 
+                na.rm.all=T , na.rm.by=T, na.rm=TRUE)  %>% as.data.frame() %>%
+    select(!!vars.g, tail(names(.), 1))
+  var.se <- tail(colnames(df.v), 1)
+  df.v$se <- df.v[[var.se]]
+  if(var.se != "se") df.v[[var.se]] <- NULL
   
-  df <- df %>%
-    left_join(df2) %>%
-    left_join(df_n) %>%
+  outSum <- left_join(df_n, df.p) %>% left_join(df.v) %>% 
     mutate(
       p.lwr = case_when(
         p == 0 ~ 0, 
@@ -268,8 +306,9 @@ getSurveyStats <- function(cname, agg_form, df_n){
         p == 1 ~ 1,
         T ~ p.upr
       )
-    )
-  return(df)
+    ) %>%
+    left_join(df.pred)
+  return(outSum)
 }
 
 require(parallel)
@@ -278,59 +317,24 @@ plan(multisession, workers = parallel::detectCores()-1) ## Parallelize using fiv
 rm(spiData)
 rm(da37692.0001)
 
-aggStats <- bind_rows(future_lapply(unname(colVars), function(x) getSurveyStats(x, aggForm, dat_n)))
-aggStats2 <- bind_rows(future_lapply(unname(colVars), function(x) getSurveyStats(x, ~V0071 + RV0005, dat_n2)))
+aggStats2 <- bind_rows(future_lapply(unname(colVars), function(x) getSummary(x, ~V0071+RV0005, dat_n2)))
+
+save(aggStats2, file = "tmp.rda")
+
+aggStats2 <- aggStats2 %>% filter(!is.na(health_outcome))
 
 rename_outcomes <- function(x) names(colVars)[colVars == x]
-aggStats$health_outcome <- unname(sapply(aggStats$health_outcome, rename_outcomes))
 aggStats2$health_outcome <- unname(sapply(aggStats2$health_outcome, rename_outcomes))
 
-colnames(aggStats)[1:length(aggVarsShort)] <- names(aggVarsShort)
 colnames(aggStats2)[1:2] <- c("System", "sex")
 
 library(stringr)
-levels(aggStats$ageCat) <- unname(sapply(levels(aggStats$ageCat), 
-                                             function(x) strsplit(x, "= ")[[1]][2]))
-levels(aggStats$sex) <- unname(sapply(levels(aggStats$sex), 
-                                             function(x) strsplit(x, "= ")[[1]][2]))
-levels(aggStats$raceEthnicity) <- unname(sapply(levels(aggStats$raceEthnicity), 
-                                          function(x) {
-                                            if(grepl("=",x)) strsplit(x, "= ")[[1]][2]
-                                            else x
-                                          }))
-aggStats$raceEthnicity <- factor(aggStats$raceEthnicity, 
-                                     levels = c("Hispanic","Black (NH)","White (NH)","Multiracial, other, or missing"))
-
 levels(aggStats2$System) <- unname(sapply(levels(aggStats2$System), 
                                   function(x) strsplit(x, "= ")[[1]][2]))
 levels(aggStats2$sex) <- unname(sapply(levels(aggStats2$sex), 
                                       function(x) strsplit(x, "= ")[[1]][2]))
 
-#would not recommend using aggregate stats for public assistance and homelessness data for jails 
-saveCrossPlots <- function(plotVars, filename){
-  g <- ggplot(aggStats %>% 
-                filter(health_outcome %in% plotVars) %>%
-                mutate(health_outcome = factor(health_outcome, levels = plotVars)),
-              aes(x = ageCat, 
-                  y = p, ymin = p.lwr, ymax = p.upr,
-                  color = sex, fill = sex, group = sex)) +
-    geom_line() +
-    scale_y_continuous("Population (%)", labels = scales::percent, expand = c(0,0),
-                       limits = c(0, NA)) +
-    scale_x_discrete("Age", guide = guide_axis(angle = 45)) +
-    geom_ribbon(alpha = 0.5) +
-    theme_bw() + 
-    facet_grid(health_outcome ~ raceEthnicity, scales = "free")
-  
-  ggsave(filename, g, width = 10, height = 10)
-}
-
 plotVars <- names(colVars)
-
-savedir = file.path(here::here(), "preprocess","figs")
-saveCrossPlots(plotVars[1:6], file.path(savedir,"med1.pdf"))
-saveCrossPlots(plotVars[7:12], file.path(savedir,"med2.pdf"))
-saveCrossPlots(plotVars[13:18], file.path(savedir,"med3.pdf"))
 
 aggStats_systems <- aggStats2 %>% 
   mutate(System2 = recode(System,
@@ -339,23 +343,30 @@ aggStats_systems <- aggStats2 %>%
                          `Federal Bureau of Prisons` = "Federal prison")) %>%
   filter(System2 %in% c("State prison","Jail","Federal prison"))
 
+aggStats_systemsLong <- aggStats_systems %>% 
+  select(System, sex, health_outcome, starts_with("p"), se)
+
+aggStats_systemsLong <- bind_rows(
+  aggStats_systemsLong %>% select(-starts_with("pred")) %>% mutate(p.model = "strat"),
+  aggStats_systemsLong %>% select(-p, -starts_with("p."), -se) %>% 
+    rename(p = pred, p.upr = pred.upr, p.lwr = pred.lwr, se = pred.se) %>%
+    mutate(p.model = "glm")
+)
+
 g <- ggplot(aggStats_systems %>% mutate(health_outcome = factor(health_outcome, levels = plotVars)),
             aes(x = System2, color = sex, group = interaction(System2, sex),
-                y = p, ymin = p.lwr, ymax = p.upr)) +
+                y = pred, ymin = pred.lwr, ymax = pred.upr)) +
+  geom_ribbon(aes(ymin = p.lwr, ymax = p.upr, fill = sex, group = sex), alpha = 0.3, position = position_dodge(width=0.5)) +
+  geom_line(aes(y = p, color = sex, group = sex), position = position_dodge(width=0.5)) +
   geom_point(position = position_dodge(width=0.5)) +
   geom_errorbar(width = 0.5, position = position_dodge(width=0.5)) +
-  scale_y_continuous("Population (%)", labels = scales::percent, expand = c(0,0.1),
+  scale_y_continuous("Population (%)", labels = scales::percent, expand = c(0,0),
                      limits = c(0, NA)) +
   scale_x_discrete("Correctional system", guide = guide_axis(angle = 45)) +
   theme_bw() + 
   facet_wrap( ~ health_outcome, scales = "free")
 
-ggsave(file.path(savedir,"med4.pdf"), g, width = 10, height = 10)
+ggsave(file.path(here::here(), "figs","med.pdf"), g, width = 15, height = 20)
 
-aggStats <- aggStats %>%
-  relocate(health_outcome, .after = last_col())
-
-write_csv(aggStats, file = file.path(here::here(), "data","healthOutcomes_bySexRaceAge.csv"))
 write_csv(aggStats_systems, file = file.path(here::here(), "data","healthOutcomes_bySystemSex.csv"))
-
 
