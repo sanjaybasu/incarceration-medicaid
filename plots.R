@@ -45,16 +45,12 @@ n_medicaid <- df_medicaid %>%
 
 # State-level counts (all prison and long-term jail stays)
 n_releases <- df_releases %>%
-  # filter(!combined_system) %>% # filter out combined jail/prison systems
   group_by(state, system, los_cutoff, combined_system) %>%
   summarise(n_releases = sum(n_releases, na.rm = T)) %>% ungroup() %>% # Yearly
   arrange(state, system, desc(los_cutoff)) %>%
   group_by(state, system, combined_system) %>%
   mutate(n = ifelse(los_cutoff == 90 | is.na(los_cutoff), n_releases, n_releases - lag(n_releases)),
          cohort = case_when(
-           # los_cutoff == 3 ~ "Jail (3-6 days)",
-           # los_cutoff == 7 ~ "Jail (7-13 days)",
-           # los_cutoff == 14 ~ "Jail (14-29 days)",
            los_cutoff == 30 ~ "Jail (30-59 days)",
            los_cutoff == 60 ~ "Jail (60-89 days)",
            los_cutoff == 90 ~ "Jail (≥90 days)",
@@ -100,7 +96,6 @@ g <- ggplot(n_releases,
   scale_x_discrete(NULL, expand = c(0,0)) +
   scale_fill_manual(values = n.pal)  + 
   labs(fill = NULL, color = NULL) + 
-  # facet_grid(~exp, scales = "free_x", space = "free", switch = "x") +
   theme_classic(base_size = 14) +
   theme(legend.position = c(0.93,0.6), 
         legend.text = element_text(size=13),
@@ -193,8 +188,8 @@ g
 ggsave(file.path(here::here(), "figs", "release_medicaid_maps.pdf"), g, device = cairo_pdf, width = 16, height = 9)
 ggsave(file.path(here::here(), "figs", "release_medicaid_maps.png"), g, width = 16, height = 9)
 
-# get state level estimates of prison + jail group. and split by sex?
-#don't need to worry about SE for prisons
+
+
 df_prison <- df_releases %>%
   filter(system != "Jail") %>%
   group_by(state) %>%
@@ -307,8 +302,6 @@ p_HO_incarc_total <- df_releases %>%
     p_outcome_se = sqrt(sum(w_se^2))
   )
 
-## Should get proportions & CI nationally.
-## Note, not very variable for prisons (similar age, sex, race distribution), ask Sanjay if they'd expect big age distirubitons between adults
 p_HO_medicaid <- df_nhanes %>%
   bind_rows(df_nsduh) %>%
   transmute(health_outcome, sex_gender, n, p_outcome = p_outcome_m, p_outcome_se, p_outcome_lwr, p_outcome_upr)
@@ -371,7 +364,6 @@ g <- ggplot(p_HO  %>%
         panel.grid.minor = element_blank(),
         panel.spacing = unit(1.5, "lines"),
         plot.margin = margin(t = 1, r = 0, b = 4, l = 0, unit = "lines"),
-        # axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
         legend.position = c(0.94,0.95),
         legend.text=element_text(size=14),
         legend.key.width = unit(1.5,"cm")
@@ -410,7 +402,6 @@ print(p_HO %>% filter(grepl("Serious\n", health_outcome)) %>%
         select(sex_gender, cohort, health_outcome, ci)
         )
 
-# Restrictions by groups (%?)
 vars_ho <- c("SUD","SUD or SMI","SUD, SMI,\nor I/DD","SUD, AMI,\nor I/DD","SUD, AMI, I/DD,\nHIV, Hep C, or\nChronic condition")
 g <- ggplot(p_HO %>% 
               mutate(health_outcome = factor(health_outcome, levels = vars_ho),
@@ -442,6 +433,9 @@ g <- ggplot(p_HO %>%
   coord_cartesian(clip = "off")
 g
 
+ggsave(file.path(here::here(), "figs", "eligibility.pdf"), g, device = cairo_pdf, width = 10, height = 6)
+ggsave(file.path(here::here(), "figs", "eligibility.png"), g, width = 10, height = 6)
+
 print(p_HO %>% filter(health_outcome %in% c("Hepatitis C", "Kidney\nProblems")) %>% 
         mutate(ci = paste0(round(p_outcome * 100, digits = 1), "%, 95% CI ",
                            round(p_outcome_lwr * 100, digits = 1), "—",
@@ -449,10 +443,11 @@ print(p_HO %>% filter(health_outcome %in% c("Hepatitis C", "Kidney\nProblems")) 
         select(sex_gender, cohort, health_outcome, ci)
 )
 
-ggsave(file.path(here::here(), "figs", "eligibility.pdf"), g, device = cairo_pdf, width = 10, height = 6)
-ggsave(file.path(here::here(), "figs", "eligibility.png"), g, width = 10, height = 6)
-
-# Health profiles by race and age group for jails and prisons?
-
+print(p_HO %>% filter(grepl("^SUD", health_outcome)) %>% 
+        mutate(ci = paste0(round(p_outcome * 100, digits = 1), "%, 95% CI ",
+                           round(p_outcome_lwr * 100, digits = 1), "—",
+                           round(p_outcome_upr * 100, digits = 1), "%")) %>%
+        select(sex_gender, cohort, health_outcome, ci)
+)
 
 

@@ -1,40 +1,42 @@
+---
+output: github_document
+---
 
 <!-- README.md is generated from README.Rmd. Please edit README.Rmd file -->
 
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
 ## Population Health Implications of Medicaid Pre-Release and Transition Services for Incarcerated Populations
+
 
 <img src="./figs/compare_release_medicaid.png" width="750px" style="display: block; margin: auto;" />
 
-This repository,
-[`incarceration-medicaid`](https://github.com/sanjaybasu/incarceration-medicaid),
-contains reproducible code for our manuscript, Population Health
-Implications of Medicaid Pre-Release and Transition Services for
-Incarcerated Populations.
+This repository, [` incarceration-medicaid
+`](https://github.com/sanjaybasu/incarceration-medicaid), contains reproducible code for our manuscript, Population Health Implications of Medicaid Pre-Release and Transition Services for Incarcerated Populations.
 
 ## Details
 
-All preprocessing code can be found in the `./preprocess` directory.
-`./preprocess/standardize_names.R` should be run last to combine files
-together. `plots.R` should be run after all files are preprocessed to
-generate summary statistics and figures used in the manuscript.
+All preprocessing code can be found in the `./preprocess` directory. `./preprocess/standardize_names.R` should be run last to combine files together. `plots.R` should be run after all files are preprocessed to generate summary statistics and figures used in the manuscript.
 
-Due to file size limitations on Github, the files in `./data/raw` and
-are *not* uploaded to this repository. All data used are referenced in
-the manuscript.
+Due to file size limitations on Github, the files in `./data/raw` and are *not* uploaded to this repository. All data used are referenced in the manuscript.
 
 ## Authors
+-   [Elizabeth T. Chin](https://etchin.github.io/)
+-   [Yiran E. Liu](https://scholar.google.com/citations?user=gh5DeWcAAAAJ)
+-   [C. Brandon Ogbunugafor](https://ogbunulab.yale.edu/)
+-   [Sanjay Basu](https://scholar.google.com/citations?user=apOctPMAAAAJ)
 
-- [Elizabeth T. Chin](https://etchin.github.io/)
-- [Yiran E. Liu](https://scholar.google.com/citations?user=gh5DeWcAAAAJ)
-- [C. Brandon Ogbunugafor](https://ogbunulab.yale.edu/)
-- [Sanjay Basu](https://scholar.google.com/citations?user=apOctPMAAAAJ)
 
 ## Package management
 
-We use [`renv`](https://rstudio.github.io/renv/index.html), but below we
-also include the relevant information to ensure reproducibility.
+We use [`renv`](https://rstudio.github.io/renv/index.html), but below we also include the relevant information to ensure reproducibility.
 
-``` r
+```{r, eval=FALSE}
 > sessioninfo::session_info(pkgs = "attached")
 ─ Session info ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  setting  value
