@@ -137,6 +137,18 @@ g
 ggsave(file.path(here::here(), "figs", "compare_release_medicaid.pdf"), g, device = cairo_pdf, width = 16, height = 9)
 ggsave(file.path(here::here(), "figs", "compare_release_medicaid.png"), g, width = 16, height = 9)
 
+print(n_releases %>% filter(state %in% c("MA","NY","SD","WY")) %>% select(state, p_incarc) %>% distinct())
+
+print(n_releases %>% 
+        filter(!combined_system) %>%
+        group_by(state, exp, n_medicaid) %>%
+        summarize(n = sum(n, na.rm = T)) %>%
+        group_by(exp) %>% 
+        summarize(n = sum(n, na.rm = T), n_medicaid = sum(n_medicaid, na.rm = T)) %>% ungroup() %>% 
+        mutate(p = n/n_medicaid) %>% 
+        group_by(exp) %>% 
+        summarize(p_incarc = sum(p)))
+
 ### MAP version
 library(fiftystater)
 data("fifty_states")
@@ -391,6 +403,13 @@ g
 ggsave(file.path(here::here(), "figs", "compare_disease_prevalence.pdf"), g, device = cairo_pdf, width = 20, height = 7)
 ggsave(file.path(here::here(), "figs", "compare_disease_prevalence.png"), g, width = 20, height = 7)
 
+print(p_HO %>% filter(grepl("Serious\n", health_outcome)) %>% 
+        mutate(ci = paste0(round(p_outcome * 100, digits = 1), "%, 95% CI ",
+                           round(p_outcome_lwr * 100, digits = 1), "—",
+                           round(p_outcome_upr * 100, digits = 1), "%")) %>%
+        select(sex_gender, cohort, health_outcome, ci)
+        )
+
 # Restrictions by groups (%?)
 vars_ho <- c("SUD","SUD or SMI","SUD, SMI,\nor I/DD","SUD, AMI,\nor I/DD","SUD, AMI, I/DD,\nHIV, Hep C, or\nChronic condition")
 g <- ggplot(p_HO %>% 
@@ -422,6 +441,13 @@ g <- ggplot(p_HO %>%
   ) +
   coord_cartesian(clip = "off")
 g
+
+print(p_HO %>% filter(health_outcome %in% c("Hepatitis C", "Kidney\nProblems")) %>% 
+        mutate(ci = paste0(round(p_outcome * 100, digits = 1), "%, 95% CI ",
+                           round(p_outcome_lwr * 100, digits = 1), "—",
+                           round(p_outcome_upr * 100, digits = 1), "%")) %>%
+        select(sex_gender, cohort, health_outcome, ci)
+)
 
 ggsave(file.path(here::here(), "figs", "eligibility.pdf"), g, device = cairo_pdf, width = 10, height = 6)
 ggsave(file.path(here::here(), "figs", "eligibility.png"), g, width = 10, height = 6)
